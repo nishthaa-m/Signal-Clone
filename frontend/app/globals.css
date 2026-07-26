@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #f4f4f6;
+  --bg-sidebar: #ffffff;
+  --bg-rail: #ebebed;
+  --bg-card: #e5e5eb;
+  --bg-hover: #dddde3;
+  --border-color: #dcdce2;
+  --text-main: #111115;
+  --text-muted: #6b7280;
+  --bg-bubble-received: #e3e3e8;
+}
+
+html.dark {
+  --bg-main: #121214;
+  --bg-sidebar: #1e1e24;
+  --bg-rail: #18181c;
+  --bg-card: #26262a;
+  --bg-hover: #2f3036;
+  --border-color: #2c2c36;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --bg-bubble-received: #28292e;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom Signal Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 140, 0.4);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 140, 0.7);
+}
