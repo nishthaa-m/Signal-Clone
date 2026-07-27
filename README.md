@@ -11,12 +11,13 @@ A full-stack, real-time encrypted messaging application built with **Next.js 14*
 
 1. Open two browser windows at the [Live Demo Link](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc).
 2. Log in as **Alice** in Window 1 and **Bob** in Window 2 (use OTP `123456`).
-3. Test real-time WebSocket features:
+3. Test all real-time WebSocket features:
    - **Live Messaging & Read Receipts**: Sent messages update from `✓` to blue `✓✓` instantly.
    - **Typing Indicators**: Active typing reflects in real-time.
    - **Disappearing Messages**: Set timer to 5s to watch messages auto-purge live.
    - **Attachments & Reactions**: Upload media or react with emojis.
    - **Multi-Select & Forwarding**: Select multiple messages to delete or forward.
+   - And many more..
 
 ---
 
