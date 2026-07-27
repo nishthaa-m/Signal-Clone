@@ -1,6 +1,7 @@
 import { Contact, Conversation, Message, MessageStatus, Reaction, User } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 class ApiError extends Error {
   constructor(public status: number, public detail: string) {
@@ -24,7 +25,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+  const response = await fetch(`${API_BASE_URL}${cleanEndpoint}`, {
     ...options,
     headers,
   });
@@ -51,88 +54,65 @@ export const apiClient = {
       body: JSON.stringify({ phone_number: phoneNumber }),
     }),
 
-  verifyOtp: (phoneNumber: string, otp: string) =>
-    request<{ access_token: string; token_type: string; user: User }>('/auth/verify-otp', {
+  login: (phoneNumber: string) =>
+    request<{ message: string; otp: string }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ phone_number: phoneNumber, otp }),
+      body: JSON.stringify({ phone_number: phoneNumber }),
     }),
 
-  profileSetup: (displayName: string, avatarUrl?: string) =>
+  verifyOtp: (identifier: string, otp: string) =>
+    request<{ access_token: string; token_type: string; user: User }>('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, otp }),
+    }),
+
+  setupProfile: (displayName: string, avatarUrl?: string) =>
     request<User>('/auth/profile-setup', {
       method: 'POST',
       body: JSON.stringify({ display_name: displayName, avatar_url: avatarUrl }),
     }),
 
-  // Uploads
-  uploadFile: async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return request<{ url: string; attachment_type: string; filename: string }>('/upload', {
-      method: 'POST',
-      body: formData,
-    });
-  },
-
   // Users & Contacts
-  getMe: () => request<User>('/users/me'),
-
-  updateMe: (data: { display_name?: string; username?: string; avatar_url?: string }) =>
-    request<User>('/users/me', {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-
-  searchUsers: (query: string) =>
-    request<User[]>(`/users/search?q=${encodeURIComponent(query)}`),
-
-  getContacts: () => request<Contact[]>('/contacts'),
-
-  addContact: (phoneOrUsername: string, nickname?: string) =>
-    request<Contact>('/contacts', {
-      method: 'POST',
-      body: JSON.stringify({ phone_or_username: phoneOrUsername, nickname }),
-    }),
+  getContacts: () => request<User[]>('/users/contacts'),
+  searchUsers: (query: string) => request<User[]>(`/users/search?q=${encodeURIComponent(query)}`),
 
   // Conversations
   getConversations: (query?: string) =>
     request<Conversation[]>(`/conversations${query ? `?q=${encodeURIComponent(query)}` : ''}`),
 
-  getConversation: (id: number) => request<Conversation>(`/conversations/${id}`),
-
-  createDirectConversation: (recipientId: number) =>
+  getOrCreateDirectConversation: (recipientId: number) =>
     request<Conversation>('/conversations/direct', {
       method: 'POST',
       body: JSON.stringify({ recipient_id: recipientId }),
     }),
 
-  clearChatHistory: (id: number) =>
-    request<{ message: string }>(`/conversations/${id}/messages`, {
+  getConversationDetail: (conversationId: number) =>
+    request<Conversation>(`/conversations/${conversationId}`),
+
+  clearChatHistory: (conversationId: number) =>
+    request<{ message: string }>(`/conversations/${conversationId}/messages`, {
       method: 'DELETE',
     }),
 
-  deleteConversation: (id: number) =>
-    request<{ message: string }>(`/conversations/${id}`, {
+  deleteConversation: (conversationId: number) =>
+    request<{ message: string }>(`/conversations/${conversationId}`, {
       method: 'DELETE',
     }),
 
-  setDisappearingTimer: (id: number, timerSeconds: number) =>
-    request<Conversation>(`/conversations/${id}/disappearing-timer`, {
+  updateDisappearingTimer: (conversationId: number, timerSeconds: number) =>
+    request<Conversation>(`/conversations/${conversationId}/disappearing-timer`, {
       method: 'PATCH',
       body: JSON.stringify({ timer_seconds: timerSeconds }),
     }),
 
-  markConversationRead: (id: number) =>
-    request<MessageStatus[]>(`/conversations/${id}/read`, {
-      method: 'PATCH',
-    }),
-
   // Messages
-  getMessages: (conversationId: number) =>
-    request<Message[]>(`/conversations/${conversationId}/messages`),
+  getMessages: (conversationId: number, limit: number = 50) =>
+    request<Message[]>(`/conversations/${conversationId}/messages?limit=${limit}`),
 
   sendMessage: (
     conversationId: number,
     content: string,
+    messageType: 'text' | 'system' = 'text',
     attachmentUrl?: string,
     attachmentType?: string,
     replyToId?: number
@@ -141,13 +121,14 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify({
         content,
+        message_type: messageType,
         attachment_url: attachmentUrl,
         attachment_type: attachmentType,
         reply_to_id: replyToId,
       }),
     }),
 
-  deleteMessage: (messageId: number) =>
+  deleteSingleMessage: (messageId: number) =>
     request<{ message: string }>(`/messages/${messageId}`, {
       method: 'DELETE',
     }),
@@ -168,6 +149,11 @@ export const apiClient = {
       method: 'PATCH',
     }),
 
+  markConversationRead: (conversationId: number) =>
+    request<MessageStatus[]>(`/conversations/${conversationId}/read`, {
+      method: 'PATCH',
+    }),
+
   // Groups
   createGroup: (name: string, memberIds: number[], avatarUrl?: string) =>
     request<Conversation>('/groups', {
@@ -175,10 +161,10 @@ export const apiClient = {
       body: JSON.stringify({ name, member_ids: memberIds, avatar_url: avatarUrl }),
     }),
 
-  addGroupMembers: (groupId: number, userIds: number[]) =>
+  addGroupMembers: (groupId: number, memberIds: number[]) =>
     request<Conversation>(`/groups/${groupId}/members`, {
       method: 'POST',
-      body: JSON.stringify({ user_ids: userIds }),
+      body: JSON.stringify({ member_ids: memberIds }),
     }),
 
   removeGroupMember: (groupId: number, userId: number) =>
@@ -190,4 +176,33 @@ export const apiClient = {
     request<{ message: string }>(`/groups/${groupId}`, {
       method: 'DELETE',
     }),
+
+  // File Upload
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('signal_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorDetail = 'Upload failed';
+      try {
+        const errData = await response.json();
+        errorDetail = errData.detail || errorDetail;
+      } catch {}
+      throw new ApiError(response.status, errorDetail);
+    }
+
+    return response.json() as Promise<{ filename: string; file_url: string; content_type: string }>;
+  },
 };
