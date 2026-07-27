@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Shield, UserMinus, UserPlus, LogOut } from 'lucide-react';
+import { X, Shield, UserMinus, UserPlus, LogOut, Search } from 'lucide-react';
 import { Conversation, User } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -26,6 +26,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   const { user: currentUser } = useAuthStore();
   const { removeConversation } = useChatStore();
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
     if (isOpen) {
       Promise.all([
         apiClient.getUsers().catch(() => []),
-        apiClient.searchUsers('').catch(() => []),
+        apiClient.searchUsers(searchQuery).catch(() => []),
         apiClient.getContacts().catch(() => []),
       ]).then(([allUsers, searched, contacts]) => {
         const contactUsers = (contacts as any[]).map((c) => c.contact_user || c);
@@ -51,7 +52,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
         setAvailableUsers(Array.from(uniqueUsersMap.values()));
       });
     }
-  }, [isOpen, currentUser?.id]);
+  }, [isOpen, searchQuery, currentUser?.id]);
 
   const handleRemove = async (targetUserId: number) => {
     try {
@@ -84,6 +85,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
       onUpdateGroup(updated);
       setSelectedUserIds([]);
       setIsAdding(false);
+      setSearchQuery('');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to add members';
       setError(msg);
@@ -92,9 +94,16 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter users not already in group
+  // Filter users not already in group and matching search query if typed
   const existingMemberUserIds = new Set(conversation.members.map((m) => Number(m.user_id)));
-  const addableUsers = availableUsers.filter((u) => u && u.id && !existingMemberUserIds.has(Number(u.id)));
+  const addableUsers = availableUsers.filter((u) => {
+    if (!u || !u.id || existingMemberUserIds.has(Number(u.id))) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const name = (u.display_name || u.username || u.phone_number || '').toLowerCase();
+    const phone = (u.phone_number || '').toLowerCase();
+    return name.includes(q) || phone.includes(q);
+  });
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -131,41 +140,76 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
           {isAdding && (
             <div className="p-3 bg-signal-card rounded-xl border border-signal-border mb-3 space-y-2">
-              <span className="text-xs font-semibold text-gray-300">Select user to add:</span>
+              <span className="text-xs font-semibold text-gray-300">Add member to group:</span>
+              
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name or phone number..."
+                  className="w-full bg-signal-sidebar text-signal-text-primary text-xs rounded-xl pl-9 pr-3 py-2 outline-none border border-signal-border focus:border-signal-blue"
+                />
+              </div>
+
               {addableUsers.length === 0 ? (
-                <p className="text-xs text-gray-500">No new users available to add</p>
+                <p className="text-xs text-gray-500 py-2 text-center">
+                  {searchQuery.trim() ? `No users matching "${searchQuery}"` : 'No new users available to add'}
+                </p>
               ) : (
-                addableUsers.map((u) => (
-                  <label key={u.id} className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedUserIds.includes(Number(u.id))}
-                      onChange={(e) => {
-                        const uid = Number(u.id);
-                        setSelectedUserIds((prev) =>
-                          e.target.checked ? [...prev, uid] : prev.filter((id) => id !== uid)
-                        );
-                      }}
-                      className="rounded border-gray-600"
-                    />
-                    <span>{u.display_name || u.username || u.phone_number}</span>
-                  </label>
-                ))
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pt-1">
+                  {addableUsers.map((u) => (
+                    <label
+                      key={u.id}
+                      className="flex items-center justify-between p-2 hover:bg-signal-hover rounded-xl text-xs text-gray-300 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <Avatar
+                          name={u.display_name || u.username || u.phone_number}
+                          src={u.avatar_url}
+                          size="sm"
+                        />
+                        <div>
+                          <div className="font-semibold text-signal-text-primary">
+                            {u.display_name || u.username || u.phone_number}
+                          </div>
+                          <div className="text-[10px] text-gray-400">{u.phone_number}</div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(Number(u.id))}
+                        onChange={(e) => {
+                          const uid = Number(u.id);
+                          setSelectedUserIds((prev) =>
+                            e.target.checked ? [...prev, uid] : prev.filter((id) => id !== uid)
+                          );
+                        }}
+                        className="rounded border-gray-600 w-4 h-4 text-signal-blue"
+                      />
+                    </label>
+                  ))}
+                </div>
               )}
 
-              <div className="flex justify-end space-x-2 pt-2">
+              <div className="flex justify-end space-x-2 pt-2 border-t border-signal-border/40">
                 <button
-                  onClick={() => setIsAdding(false)}
-                  className="px-2 py-1 text-xs text-gray-400 hover:text-white"
+                  onClick={() => {
+                    setIsAdding(false);
+                    setSearchQuery('');
+                  }}
+                  className="px-3 py-1.5 text-xs text-gray-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddMembers}
                   disabled={selectedUserIds.length === 0}
-                  className="px-3 py-1 bg-signal-blue text-white text-xs rounded-lg font-medium disabled:opacity-40"
+                  className="px-4 py-1.5 bg-signal-blue text-white text-xs rounded-xl font-semibold disabled:opacity-40 hover:bg-blue-600 transition-colors"
                 >
-                  Add
+                  Add Selected ({selectedUserIds.length})
                 </button>
               </div>
             </div>

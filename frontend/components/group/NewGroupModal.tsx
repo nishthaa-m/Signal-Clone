@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Search } from 'lucide-react';
 import { User } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -22,6 +22,7 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
     if (isOpen) {
       Promise.all([
         apiClient.getUsers().catch(() => []),
-        apiClient.searchUsers('').catch(() => []),
+        apiClient.searchUsers(searchQuery).catch(() => []),
         apiClient.getContacts().catch(() => []),
       ]).then(([allUsers, searched, contacts]) => {
         const contactUsers = (contacts as any[]).map((c) => c.contact_user || c);
@@ -44,7 +45,7 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
         setAvailableUsers(Array.from(uniqueUsersMap.values()));
       });
     }
-  }, [isOpen, currentUser?.id]);
+  }, [isOpen, searchQuery, currentUser?.id]);
 
   const toggleSelect = (userId: number) => {
     const uid = Number(userId);
@@ -67,6 +68,7 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
       setName('');
       setAvatarUrl('');
       setSelectedUserIds([]);
+      setSearchQuery('');
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create group';
@@ -77,6 +79,15 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const filteredUsers = availableUsers.filter((u) => {
+    if (!u || !u.id) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const displayName = (u.display_name || u.username || u.phone_number || '').toLowerCase();
+    const phone = (u.phone_number || '').toLowerCase();
+    return displayName.includes(q) || phone.includes(q);
+  });
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -117,11 +128,30 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-3">
-            <div className="text-[11px] font-semibold text-gray-400 px-1 mb-2 uppercase">Select Group Members ({selectedUserIds.length})</div>
-            {availableUsers.length === 0 ? (
-              <div className="text-xs text-gray-500 p-4 text-center">No available users found</div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase">
+                Select Members ({selectedUserIds.length})
+              </span>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="relative mb-2">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name or phone number..."
+                className="w-full bg-signal-card text-signal-text-primary text-xs rounded-xl pl-9 pr-3 py-2 outline-none border border-signal-border focus:border-signal-blue"
+              />
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <div className="text-xs text-gray-500 p-4 text-center">
+                {searchQuery.trim() ? `No users matching "${searchQuery}"` : 'No available users found'}
+              </div>
             ) : (
-              availableUsers.map((u) => {
+              filteredUsers.map((u) => {
                 const uid = Number(u.id);
                 const isSelected = selectedUserIds.includes(uid);
                 return (

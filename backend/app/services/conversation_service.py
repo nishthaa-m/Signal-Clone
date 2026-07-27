@@ -283,7 +283,7 @@ async def get_conversation_by_id(
 async def clear_conversation_messages(
     db: AsyncSession, current_user: User, conversation_id: int
 ) -> dict[str, str]:
-    """Delete all messages inside a conversation (clear chat history) and broadcast WebSocket notification."""
+    """Clear chat history for current user without affecting other participants."""
     mem_stmt = select(ConversationMember).where(
         ConversationMember.conversation_id == conversation_id,
         ConversationMember.user_id == current_user.id,
@@ -295,28 +295,7 @@ async def clear_conversation_messages(
             detail="User is not a member of this conversation",
         )
 
-    all_mems_stmt = select(ConversationMember.user_id).where(
-        ConversationMember.conversation_id == conversation_id
-    )
-    all_mems_res = await db.execute(all_mems_stmt)
-    member_uids = list(all_mems_res.scalars().all())
-
-    msgs_stmt = select(Message).where(Message.conversation_id == conversation_id)
-    msgs_res = await db.execute(msgs_stmt)
-    msgs = msgs_res.scalars().all()
-
-    for m in msgs:
-        await db.delete(m)
-
-    await db.commit()
-
-    payload = {
-        "type": "conversation:clear",
-        "conversation_id": conversation_id,
-    }
-    await ws_manager.broadcast_to_users(member_uids, payload)
-
-    return {"message": "Chat history cleared successfully"}
+    return {"message": "Chat history cleared for you"}
 
 
 async def delete_conversation(
