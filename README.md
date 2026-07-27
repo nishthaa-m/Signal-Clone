@@ -2,14 +2,14 @@
 
 A full-stack, real-time encrypted messaging application built with **Next.js 14**, **FastAPI**, **WebSockets**, and **SQLite**.
 
-> 🌐 **Live Demo**: [https://signal-clone-7s73a1qff-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=WK1ISnPMbJF2W2QwJG7UWbIa1aSrxigo](https://signal-clone-7s73a1qff-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=WK1ISnPMbJF2W2QwJG7UWbIa1aSrxigo)  
+> 🌐 **Live Demo**: [https://signal-clone-eta.vercel.app/](https://signal-clone-eta.vercel.app/)  
 > 🔑 **Demo Login**: **Alice** (`5550001001`) | **Bob** (`5550001002`) | **OTP**: `123456`
 
 ---
 
 ## ⚡ Quick Testing (Multi-Window Real-Time Evaluation)
 
-1. Open two browser windows at the [Live Demo Link](https://signal-clone-7s73a1qff-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=WK1ISnPMbJF2W2QwJG7UWbIa1aSrxigo).
+1. Open two browser windows at the [Live Demo Link](https://signal-clone-eta.vercel.app/).
 2. Log in as **Alice** in Window 1 and **Bob** in Window 2 (use OTP `123456`).
 3. Test all real-time WebSocket features:
    - **Live Messaging & Read Receipts**: Sent messages update from `✓` to blue `✓✓` instantly.
