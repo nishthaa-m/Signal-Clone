@@ -1,184 +1,195 @@
-# 💬 Signal Desktop Web Clone
+# 💬 Signal Desktop Web Clone — Internship Assignment Submission
 
-A full-stack, end-to-end encrypted messaging web application engineered to mirror **Signal Desktop**. Built with **Next.js 14**, **FastAPI**, **WebSockets**, and **SQLite**.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel_Frontend-000000?style=for-the-badge&logo=vercel)](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc)
+[![Backend Status](https://img.shields.io/badge/Backend_API-FastAPI_Active-009688?style=for-the-badge&logo=fastapi)](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app)
+[![Tech Stack](https://img.shields.io/badge/Tech_Stack-Next.js_14_|__FastAPI_|__WebSockets_|__SQLite-blue?style=for-the-badge)](#-tech-stack)
 
----
-
-## 🌐 Live Demo & Quick Testing Guide
-
-- **Live Application Link**: [https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc)
-- **GitHub Repository**: [https://github.com/nishthaa-m/Signal-Clone.git](https://github.com/nishthaa-m/Signal-Clone.git)
-
-### 🧪 2-Minute Multi-Window Evaluator Test:
-1. **Open Two Windows**: Open a normal browser window and an Incognito window.
-2. **Login Window 1 (Alice)**: Click **Alice Smith** (`5550001001` or `alice_smith`), enter OTP **`123456`**.
-3. **Login Window 2 (Bob)**: Click **Bob Jones** (`5550001002` or `bob_jones`), enter OTP **`123456`**.
-4. **Verify Core Real-Time Features**:
-   - 💬 **Instant Sync & Receipts**: Send a message from Alice ➔ Arrives live in Bob's window. Single tick `✓` instantly updates to double blue tick `✓✓`.
-   - ✍️ **Typing Indicators**: Type text in Alice's composer ➔ Live *"Alice is typing..."* appears in Bob's window.
-   - ⏱️ **Disappearing Messages**: Click the Clock icon ➔ Set timer to **5 seconds** ➔ Send a message and watch it self-destruct live on both screens!
-   - 📎 **Attachments & Reactions**: Attach images/files or react with emojis (`❤️`, `👍`) live.
-   - ☑️ **Multi-Select & Forwarding**: Click `...` on a message bubble ➔ Select multiple messages ➔ Bulk delete ("Delete for me") or forward to another contact.
+A production-grade, full-stack real-time messaging web application inspired by **Signal Desktop**. Designed and implemented to fulfill all requirements for the Full-Stack Engineering Internship Assignment.
 
 ---
 
-## 📋 Evaluation Criteria Mapping
+## 🎯 Evaluator Quick Start & Testing Guide
 
-This codebase is structured specifically to fulfill the 7 core evaluation criteria:
-
-```
-┌───────────────────────────┬─────────────────────────────────────────────────────────────┐
-│ Evaluation Criteria       │ Implementation Highlight                                    │
-├───────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 1. Functionality          │ Real-time WS sync, receipts, disappearing messages, groups  │
-│ 2. UI/UX                  │ Pixel-perfect Signal Desktop rail, HSL dark/light modes     │
-│ 3. Database Design        │ 7 relational tables, foreign keys, cascade constraints      │
-│ 4. Backend / API Design   │ Decoupled FastAPI architecture, WS connection manager       │
-│ 5. Code Quality           │ Strict TypeScript types, PEP 8 Python, async execution      │
-│ 6. Code Modularity        │ Atomic UI components, service-repository layer pattern      │
-│ 7. Code Understanding     │ Self-explanatory architectural documentation & flow charts │
-└───────────────────────────┴─────────────────────────────────────────────────────────────┘
-```
+### 🌐 Live Application Link
+👉 **[Click Here to Launch Signal Web Clone Live Demo](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc)**
 
 ---
 
-## 1. ⚡ Functionality & Feature Matrix
+### 🔑 Demo Evaluation Credentials
 
-| Feature | Technical Implementation | Status |
-| :--- | :--- | :---: |
-| **Real-Time Messaging** | Native WebSockets (`/ws/{token}`) with client heartbeat ping/pong | ✅ Working |
-| **Status Receipts** | Live `SENT` (`✓`), `DELIVERED` (`✓✓`), and `READ` (`✓✓` blue) state tracking | ✅ Working |
-| **Disappearing Messages** | Timer engine auto-purges expired messages from DB queries & Zustand store | ✅ Working |
-| **Attachments & Media** | File upload pipeline (`POST /upload`) supporting image previews & file badges | ✅ Working |
-| **Emoji Reactions** | Real-time emoji toggling (`message:reaction` WS broadcast) | ✅ Working |
-| **Quoted Replies** | Quoted message preview bar & bubble reply rendering | ✅ Working |
-| **Multi-Select & Forward**| Checkbox selection bar for bulk "Delete for me" and message forwarding | ✅ Working |
-| **Group Administration**| Group creation, admin role enforcement, member add/remove, leave group | ✅ Working |
-| **Dual Authentication** | Accepts 10-digit phone numbers OR usernames with fixed OTP (`123456`) | ✅ Working |
-| **Keyboard Shortcuts** | `Ctrl+K` (Search), `Ctrl+Shift+N` (New Chat), `Ctrl+Shift+G` (New Group), `Esc` | ✅ Working |
-
----
-
-## 2. 🎨 UI/UX Design Alignment
-
-- **Signal Desktop Layout**: Features Signal's signature 3-pane desktop design:
-  1. **Far-Left Navigation Rail**: Quick access to Chats, Calls, Stories, Settings, and User Avatar.
-  2. **Conversation Sidebar**: Real-time search, unread badge counters, online status dots, and last message previews.
-  3. **Main Chat Pane**: Header with encryption lock badge, disappearing timer indicator, light/dark mode toggle, audio/video call placeholders, and message feed.
-- **Theme System**: Full light and dark mode CSS variable token system matching Signal Desktop's native HSL palette.
-
----
-
-## 3. 🗄️ Database Design (Relational Schema)
-
-The backend utilizes **SQLite** with **Async SQLAlchemy 2.0 ORM** modeling 7 relational tables with foreign keys and cascade constraints:
-
-```
- ┌──────────────┐       ┌──────────────────────┐       ┌───────────────────────┐
- │    User      │──────<│  ConversationMember  │>──────│     Conversation      │
- └──────────────┘       └──────────────────────┘       └───────────────────────┘
-        │                           │                              │
-        │ 1                         │ 1                            │ 1
-        ▼ N                         ▼ N                            ▼ N
- ┌──────────────┐       ┌──────────────────────┐       ┌───────────────────────┐
- │   Contact    │       │       Message        │──────<│     MessageStatus     │
- └──────────────┘       └──────────────────────┘       └───────────────────────┘
-                                    │
-                                    │ 1
-                                    ▼ N
-                        ┌──────────────────────┐
-                        │   MessageReaction    │
-                        └──────────────────────┘
-```
-
-### Table Definitions:
-1. **`users`**: `id`, `phone_number` (unique), `username` (unique), `display_name`, `avatar_url`, `is_online`, `last_seen`.
-2. **`contacts`**: `id`, `user_id` (FK), `contact_user_id` (FK), `nickname`.
-3. **`conversations`**: `id`, `type` (`direct`/`group`), `name`, `avatar_url`, `disappearing_timer`, `created_at`, `updated_at`.
-4. **`conversation_members`**: `id`, `conversation_id` (FK), `user_id` (FK), `role` (`member`/`admin`), `joined_at`.
-5. **`messages`**: `id`, `conversation_id` (FK), `sender_id` (FK), `content`, `message_type` (`text`/`system`), `attachment_url`, `attachment_type`, `reply_to_id` (FK), `expires_at`, `created_at`.
-6. **`message_statuses`**: `id`, `message_id` (FK), `user_id` (FK), `status` (`sent`/`delivered`/`read`), `updated_at`.
-7. **`message_reactions`**: `id`, `message_id` (FK), `user_id` (FK), `emoji`, `created_at`.
-
----
-
-## 4. 🏗️ Backend & API Design
-
-Built with **FastAPI** using a decoupled 3-tier architecture (Routes ➔ Services ➔ DB Models):
-
-### API Endpoint Summary:
-- **Auth (`/auth`)**:
-  - `POST /auth/register` — Request OTP (Phone or Username)
-  - `POST /auth/verify-otp` — Verify OTP code (`123456`) & return JWT token
-  - `POST /auth/profile-setup` — Update display name and avatar URL
-- **Conversations (`/conversations`)**:
-  - `GET /conversations` — List active user conversations sorted by activity
-  - `POST /conversations/direct` — Deduplicated 1:1 conversation lookup
-  - `GET /conversations/{id}` — Fetch conversation metadata and members
-  - `DELETE /conversations/{id}/messages` — Clear chat history
-  - `PATCH /conversations/{id}/disappearing-timer` — Update disappearing timer
-- **Messages (`/messages`)**:
-  - `GET /conversations/{id}/messages` — Fetch unexpired message history
-  - `POST /conversations/{id}/messages` — Send message / reply / attachment
-  - `DELETE /messages/{id}` — Single message "Delete for me"
-  - `POST /messages/{id}/reactions` — Toggle emoji reaction
-  - `PATCH /messages/{id}/read` — Mark message as read
-- **Groups (`/groups`)**:
-  - `POST /groups` — Create group (Admin)
-  - `POST /groups/{id}/members` — Add members (Admin)
-  - `DELETE /groups/{id}/members/{user_id}` — Remove member or leave group
-  - `DELETE /groups/{id}` — Delete group (Admin)
-- **Real-Time WebSockets (`/ws/{token}`)**:
-  - Bi-directional connection manager maintaining active user socket pools.
-
----
-
-## 5. 💻 Code Quality & Modularity
-
-- **Strict Type Safety**: Full TypeScript interfaces (`types.ts`) on frontend and Pydantic v2 schemas on backend.
-- **Atomic UI Components**: Reusable UI primitives (`Avatar`, `StatusCheck`, `MessageBubble`, `MessageInput`, `ConversationItem`).
-- **Centralized State**: Zustand store (`useChatStore.ts` & `useAuthStore.ts`) managing persistent auth credentials and live reactive chat states.
-
----
-
-## 6. 🧠 Code Understanding & Evaluation Q&A
-
-### Q1: How does real-time synchronization work across multiple tabs?
-> **Answer**: The backend maintains an in-memory `ConnectionManager` indexed by `user_id`. When an event occurs (e.g. `send_message`), the backend broadcasts a JSON payload to all active socket connections belonging to conversation members. The frontend `handleWSEvent` listener catches the event and updates the Zustand store reactively.
-
-### Q2: How are disappearing messages enforced?
-> **Answer**: Disappearing messages set an `expires_at = timestamp + timer`. On backend queries (`get_conversation_messages` and `get_user_conversations`), SQL queries filter `(expires_at IS NULL OR expires_at > NOW)`. On frontend, a 1-second interval calls `purgeExpiredMessages()`, instantly purging expired bubbles from memory.
-
-### Q3: How is 1:1 conversation deduplication guaranteed?
-> **Answer**: `get_or_create_direct_conversation` queries existing `DIRECT` conversations containing both user IDs. Frontend `useChatStore` enforces co-member recipient deduplication, preventing duplicate chat cards in the sidebar.
-
----
-
-## 🔑 Demo Account Credentials
-
-| User | Phone Number | Username | Demo OTP Code |
+| User Name | Phone Number (10 Digits) | Username | Fixed Demo OTP Code |
 | :--- | :--- | :--- | :--- |
-| **Alice Smith** | `5550001001` | `alice_smith` | `123456` |
-| **Bob Jones** | `5550001002` | `bob_jones` | `123456` |
-| **Charlie Brown** | `5550001003` | `charlie_brown` | `123456` |
-| **Diana Prince** | `5550001004` | `diana_prince` | `123456` |
-| **Edward Snow** | `5550001005` | `edward_snow` | `123456` |
+| **Alice Smith** | `5550001001` | `alice_smith` | **`123456`** |
+| **Bob Jones** | `5550001002` | `bob_jones` | **`123456`** |
+| **Charlie Brown** | `5550001003` | `charlie_brown` | **`123456`** |
+| **Diana Prince** | `5550001004` | `diana_prince` | **`123456`** |
+| **Edward Snow** | `5550001005` | `edward_snow` | **`123456`** |
 
 ---
 
-## ⚙️ Local Setup Instructions
+### 🧪 60-Second Multi-Window Real-Time Evaluation Protocol
+
+To test bi-directional real-time WebSocket synchronization across users:
+
+1. **Open Two Browser Windows** side-by-side (e.g., standard browser window & incognito window).
+2. **Window 1 (Alice)**: Click **Alice Smith** (`5550001001` / `alice_smith`), enter OTP **`123456`**.
+3. **Window 2 (Bob)**: Click **Bob Jones** (`5550001002` / `bob_jones`), enter OTP **`123456`**.
+4. **Execute Verification Checklist**:
+
+| Feature to Test | Action in Window 1 (Alice) | Expected Result in Window 2 (Bob) | Status |
+| :--- | :--- | :--- | :---: |
+| **1:1 Real-Time Chat** | Send text message `"Hello Bob!"` | Arrives instantly over WebSocket without page refresh | ✅ Verified |
+| **Read Receipts & Ticks** | Message sent | Alice sees `✓` (sent), `✓✓` (delivered), `✓✓` (blue read when Bob opens chat) | ✅ Verified |
+| **Typing Indicator** | Type text into input box | Banner shows *"Alice Smith is typing..."* live in Bob's window | ✅ Verified |
+| **Disappearing Messages** | Click Clock icon ➔ Set timer to **5 seconds** ➔ Send message | Message self-destructs live on both screens after 5 seconds | ✅ Verified |
+| **Attachments** | Click Paperclip icon ➔ Upload image or file | Rendered image card & download badge appear live | ✅ Verified |
+| **Message Reactions** | Click Emoji icon on bubble | Emoji reaction pill (`❤️`, `👍`) updates live on both sides | ✅ Verified |
+| **Quoted Replies** | Click Reply icon `↩️` on message | Quoted reply preview box rendered inside message bubble | ✅ Verified |
+| **Multi-Select & Forward** | Click `...` ➔ Select ➔ Choose messages ➔ Forward | Opens conversation picker modal and forwards messages to new chat | ✅ Verified |
+| **Delete for Me** | Click `...` ➔ Select "Delete for me" | Removes message locally from Alice's view | ✅ Verified |
+| **Group Administration** | Click `+` ➔ Create Group ➔ Add Members / Leave | Group updates live for all members; admin controls intact | ✅ Verified |
+
+---
+
+## 🛠️ Architecture & System Design
+
+The application follows a decoupled client-server architecture:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Next.js 14 Web Frontend                         │
+│   (App Router, React 18, Zustand Stores, Tailwind Signal UI System)    │
+└──────────────────┬─────────────────────────────────┬───────────────────┘
+                   │ HTTP REST APIs                  │ WebSockets
+                   ▼                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        FastAPI Async Backend                           │
+│   (Auth Service, Message Engine, WS Connection Manager, Static Files)   │
+└──────────────────┬─────────────────────────────────────────────────────┘
+                   │ Async SQLAlchemy 2.0 ORM
+                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       SQLite Relational Database                       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Highlights
+1. **Real-Time WebSocket Manager (`app/core/ws_manager.py`)**: Maintains active user connection pools, broadcasting real-time events (`message:new`, `message:status`, `message:delete`, `message:reaction`, `typing`, `presence`, `conversation:update`, `conversation:clear`).
+2. **Synchronous Sidebar & Chat Sync**: Disappearing timer events and group updates broadcast system notifications that update both the left sidebar conversation list and active chat view simultaneously.
+3. **Dual Authentication Support**: Identifiers are parsed dynamically, allowing login using either **10-digit phone numbers** (e.g. `5550001001`) or **usernames** (e.g. `alice_smith`).
+
+---
+
+## 🗄️ Database Schema
+
+The database consists of 7 relational tables managed via SQLAlchemy 2.0 Async ORM:
+
+```
+┌───────────────┐        ┌───────────────────┐        ┌───────────────────┐
+│     users     │───────<│   contacts        │        │   conversations   │
+└───────┬───────┘        └───────────────────┘        └─────────┬─────────┘
+        │                                                       │
+        ├───────────────────────────────────────────────────────┤
+        │                                                       │
+        ▼                                                       ▼
+┌───────────────┐                                     ┌───────────────────┐
+│   messages    │>────────────────────────────────────│conv_members       │
+└───────┬───────┘                                     └───────────────────┘
+        │
+        ├──────────────────────┐
+        ▼                      ▼
+┌───────────────┐      ┌───────────────┐
+│ msg_statuses  │      │ msg_reactions │
+└───────────────┘      └───────────────┘
+```
+
+1. **`users`**: User profiles, 10-digit normalized phone, username, display name, avatar, online status, last seen.
+2. **`contacts`**: Mutual contact mappings and nicknames.
+3. **`conversations`**: Direct (1:1) and Group conversation records with disappearing message timer metadata.
+4. **`conversation_members`**: Membership roles (`member`, `admin`) and join timestamps.
+5. **`messages`**: Text/system messages, media attachment URLs, quoted reply IDs, and disappearing timestamps (`expires_at`).
+6. **`message_statuses`**: Per-user delivery and read receipts (`sent`, `delivered`, `read`).
+7. **`message_reactions`**: Emoji reaction mappings per user.
+
+---
+
+## 📡 API Reference
+
+### Authentication (`/auth`)
+- `POST /auth/register` — Initiate login/registration (accepts 10-digit phone OR username).
+- `POST /auth/verify-otp` — Verify OTP (`123456`) and return JWT bearer token.
+- `POST /auth/profile-setup` — Update display name & avatar.
+
+### Conversations (`/conversations`)
+- `GET /conversations` — Fetch active conversations sorted by activity.
+- `POST /conversations/direct` — Retrieve or create 1:1 conversation with target user.
+- `GET /conversations/{id}` — Fetch conversation metadata and member list.
+- `DELETE /conversations/{id}/messages` — Clear chat history.
+- `PATCH /conversations/{id}/disappearing-timer` — Update disappearing message timer.
+
+### Messages (`/messages`)
+- `POST /conversations/{id}/messages` — Send text/attachment message or quoted reply.
+- `GET /conversations/{id}/messages` — Fetch conversation message history.
+- `DELETE /messages/{id}` — Delete single message ("Delete for me").
+- `POST /messages/{id}/reactions` — Toggle emoji reaction.
+- `PATCH /messages/{id}/read` — Mark message status as READ.
+
+### Groups (`/groups`)
+- `POST /groups` — Create a new group conversation (Admin).
+- `POST /groups/{id}/members` — Add members to existing group (Admin).
+- `DELETE /groups/{id}/members/{user_id}` — Remove member or leave group.
+- `DELETE /groups/{id}` — Delete entire group (Admin).
+
+### Uploads (`/upload`)
+- `POST /upload` — Upload image or document attachment.
+
+---
+
+## 🚀 Local Run & Automated Test Execution
+
+### 1. Backend Setup & Automated Test Suite
 
 ```bash
-# 1. Backend Setup
 cd backend
-python -m venv venv
-.\venv\Scripts\activate   # Linux/macOS: source venv/bin/activate
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8000
 
-# 2. Frontend Setup
+# Create & activate virtual environment
+python -m venv venv
+.\venv\Scripts\activate      # On Windows
+source venv/bin/activate    # On Linux/macOS
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run Automated Test Suites
+python tests/test_stage11_advanced_features.py
+python tests/test_stage12_realtime_fixes.py
+python tests/test_stage13_auth_redesign.py
+python tests/test_stage14_multiselect_forward.py
+python tests/test_stage15_bugfixes.py
+python tests/test_stage16_preview_sync.py
+
+# Launch Backend Development Server
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+### 2. Frontend Setup
+
+```bash
 cd frontend
+
+# Install dependencies
 npm install
+
+# Launch Development Server
 npm run dev
 ```
-> Open `http://localhost:3000` in your browser.
+
+---
+
+## 📝 Assumptions, Mocked Data & Evaluation Notes
+
+1. **SMS Gateway Simulation**: Fixed demo OTP `123456` is implemented for instant evaluator testing without SMS costs or delay.
+2. **Pre-Seeded Data**: Pre-seeded with 5 realistic user accounts, contacts, direct chats, and group conversations.
+3. **File Attachment Storage**: Media/file uploads are saved under `/uploads` and served via static file middleware.
+4. **End-to-End Encryption Indicators**: Modeled with visual encryption lock badges in header and chat panes.
+5. **Signal Desktop Layout**: UI incorporates Signal Desktop's far-left navigation rail (Chats, Calls, Stories, Settings) with clean "Coming Soon" placeholder screens.
