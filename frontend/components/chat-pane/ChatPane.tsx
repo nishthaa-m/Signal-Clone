@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Phone, Video, MoreVertical, Lock, Users, Trash2, Sun, Moon, Eraser, Clock, Forward, CheckSquare, X, LogOut } from 'lucide-react';
+import { Phone, Video, MoreVertical, Lock, Users, Trash2, Sun, Moon, Eraser, Clock, Forward, CheckSquare, X, LogOut, ShieldAlert } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { Conversation, Message } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
@@ -89,6 +89,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isNotMember, setIsNotMember] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTimerMenuOpen, setIsTimerMenuOpen] = useState(false);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -100,11 +101,11 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   const messages = messagesMap[conversation.id] || [];
   const typingUserIds = typingMap[conversation.id] || [];
 
-  const currentMember = conversation.members.find((m) => m.user_id === currentUser?.id);
+  const currentMember = conversation.members.find((m) => Number(m.user_id) === Number(currentUser?.id));
   const isGroupAdmin = conversation.type === 'group' && currentMember?.role === 'admin';
 
   const otherMember = conversation.type === 'direct'
-    ? conversation.members.find((m) => m.user_id !== currentUser?.id)
+    ? conversation.members.find((m) => Number(m.user_id) !== Number(currentUser?.id))
     : null;
 
   const displayName = conversation.type === 'direct' && otherMember?.user
@@ -123,21 +124,36 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     : null;
 
   useEffect(() => {
+    const isMemberCurrently = conversation.type === 'group'
+      ? conversation.members.some((m) => Number(m.user_id) === Number(currentUser?.id))
+      : true;
+
+    if (!isMemberCurrently) {
+      setIsNotMember(true);
+    } else {
+      setIsNotMember(false);
+    }
+
     const loadMessages = async () => {
       setIsLoading(true);
       try {
         const history = await apiClient.getMessages(conversation.id);
         setMessages(conversation.id, history);
         await apiClient.markConversationRead(conversation.id);
-      } catch (err) {
-        console.error('Failed to load message history:', err);
+        setIsNotMember(false);
+      } catch (err: any) {
+        if (err?.status === 403 || err?.detail?.includes('not a member')) {
+          setIsNotMember(true);
+        } else {
+          console.error('Failed to load message history:', err);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     loadMessages();
-  }, [conversation.id, setMessages]);
+  }, [conversation.id, conversation.members, currentUser?.id, setMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -258,7 +274,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       if (conversation.type === 'group') {
         if (isGroupAdmin) {
           await apiClient.deleteGroup(conversation.id);
-        } else if (currentUser) {
+        } else if (currentUser && !isNotMember) {
           await apiClient.removeGroupMember(conversation.id, currentUser.id);
         }
       } else {
@@ -274,7 +290,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   };
 
   const handleOpenDirectChat = async (recipientId: number) => {
-    if (currentUser && recipientId === currentUser.id) return;
+    if (currentUser && Number(recipientId) === Number(currentUser.id)) return;
     try {
       const conv = await apiClient.createDirectConversation(recipientId);
       const exists = conversations.some((c) => c.id === conv.id);
@@ -355,7 +371,9 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
                 <Lock className="w-3 h-3 text-signal-text-secondary flex-shrink-0" />
               </h2>
               <p className="text-xs text-signal-text-secondary truncate">
-                {typingText ? (
+                {isNotMember ? (
+                  <span className="text-rose-400 font-medium">Not a member</span>
+                ) : typingText ? (
                   <span className="text-signal-blue font-medium animate-pulse">{typingText}</span>
                 ) : conversation.type === 'group' ? (
                   `${conversation.members.length} members`
@@ -486,7 +504,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
                     className="w-full flex items-center space-x-2 px-4 py-2.5 hover:bg-signal-hover text-rose-500 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Leave Group</span>
+                    <span>{isNotMember ? 'Delete Chat' : 'Leave Group'}</span>
                   </button>
                 )
               ) : (
@@ -503,50 +521,75 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
         </div>
       </div>
 
-      {/* Messages Feed */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-1">
-        {isLoading && messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-            Loading Signal messages...
+      {/* Messages Feed / Non-Member Banner */}
+      {isNotMember ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-full flex items-center justify-center text-rose-400">
+            <ShieldAlert className="w-8 h-8" />
           </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                currentUserId={currentUser.id}
-                isGroup={conversation.type === 'group'}
-                isSelectMode={isSelectMode}
-                isSelected={selectedMessageIds.includes(msg.id)}
-                onToggleSelect={handleToggleSelectMessage}
-                onEnterSelectMode={() => {
-                  setIsSelectMode(true);
-                  setSelectedMessageIds([msg.id]);
-                }}
-                onForwardMessage={handleTriggerForwardSingle}
-                onOpenDirectChat={handleOpenDirectChat}
-              />
-            ))}
-
-            {typingUserIds.length > 0 && (
-              <div className="flex items-center space-x-2 my-2 text-xs text-gray-500 italic">
-                <span className="inline-flex items-center space-x-1.5 bg-signal-card border border-signal-border px-3.5 py-1.5 rounded-full shadow-xs">
-                  <span className="w-1.5 h-1.5 bg-signal-blue rounded-full animate-pulse" />
-                  <span className="w-1.5 h-1.5 bg-signal-blue rounded-full animate-pulse delay-75" />
-                  <span className="w-1.5 h-1.5 bg-signal-blue rounded-full animate-pulse delay-150" />
-                  <span className="ml-1 text-signal-text-primary not-italic font-medium">{typingText}</span>
-                </span>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-signal-text-primary">
+              You are no longer a member of this group
+            </h3>
+            <p className="text-xs text-signal-text-secondary max-w-sm">
+              You left or were removed from this group by an admin. You cannot send or receive new messages here.
+            </p>
+          </div>
+          <button
+            onClick={handleDeleteChat}
+            className="flex items-center space-x-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-md"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete Group Chat</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto p-4 space-y-1">
+            {isLoading && messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                Loading Signal messages...
               </div>
+            ) : (
+              <>
+                {messages.map((msg) => (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    currentUserId={currentUser.id}
+                    isGroup={conversation.type === 'group'}
+                    isSelectMode={isSelectMode}
+                    isSelected={selectedMessageIds.includes(msg.id)}
+                    onToggleSelect={handleToggleSelectMessage}
+                    onEnterSelectMode={() => {
+                      setIsSelectMode(true);
+                      setSelectedMessageIds([msg.id]);
+                    }}
+                    onForwardMessage={handleTriggerForwardSingle}
+                    onOpenDirectChat={handleOpenDirectChat}
+                  />
+                ))}
+
+                {typingUserIds.length > 0 && (
+                  <div className="flex items-center space-x-2 my-2 text-xs text-gray-500 italic">
+                    <span className="inline-flex items-center space-x-1.5 bg-signal-card border border-signal-border px-3.5 py-1.5 rounded-full shadow-xs">
+                      <span className="w-1.5 h-1.5 bg-signal-blue rounded-full animate-pulse" />
+                      <span className="w-1.5 h-1.5 bg-signal-blue rounded-full animate-pulse delay-75" />
+                      <span className="w-1.5 h-1.5 bg-signal-blue rounded-full animate-pulse delay-150" />
+                      <span className="ml-1 text-signal-text-primary not-italic font-medium">{typingText}</span>
+                    </span>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </>
             )}
+          </div>
 
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
-
-      {/* Input */}
-      <MessageInput conversationId={conversation.id} onSendMessage={handleSendMessage} />
+          {/* Input */}
+          <MessageInput conversationId={conversation.id} onSendMessage={handleSendMessage} />
+        </>
+      )}
 
       {/* Forward Modal */}
       {isForwardModalOpen && (

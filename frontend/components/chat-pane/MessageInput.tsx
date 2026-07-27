@@ -113,6 +113,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setReplyingToMessage(null)}
             className="p-1 text-gray-400 hover:text-white rounded-full"
           >
@@ -135,6 +136,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             </span>
           </div>
           <button
+            type="button"
             onClick={() => setAttachment(null)}
             className="p-1 text-gray-400 hover:text-white rounded-full"
           >
@@ -149,6 +151,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           {EMOJI_LIST.map((emoji) => (
             <button
               key={emoji}
+              type="button"
               onClick={() => {
                 setContent((prev) => prev + emoji);
                 setIsEmojiOpen(false);

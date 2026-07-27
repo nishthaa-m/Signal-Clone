@@ -18,5 +18,11 @@ class GroupUpdate(BaseModel):
 
 
 class GroupMemberAdd(BaseModel):
-    """Schema for adding new members to an existing group."""
-    user_ids: List[int] = Field(..., min_items=1, example=[4, 5])
+    """Schema for adding new members to an existing group, accepting user_ids or member_ids."""
+    user_ids: Optional[List[int]] = Field(None, example=[4, 5])
+    member_ids: Optional[List[int]] = Field(None, example=[4, 5])
+
+    @property
+    def target_user_ids(self) -> List[int]:
+        """Return combined target user IDs from user_ids or member_ids."""
+        return self.user_ids or self.member_ids or []

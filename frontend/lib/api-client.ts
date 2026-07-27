@@ -176,7 +176,7 @@ export const apiClient = {
   addGroupMembers: (groupId: number, memberIds: number[]) =>
     request<Conversation>(`/groups/${groupId}/members`, {
       method: 'POST',
-      body: JSON.stringify({ member_ids: memberIds }),
+      body: JSON.stringify({ user_ids: memberIds, member_ids: memberIds }),
     }),
 
   removeGroupMember: (groupId: number, userId: number) =>

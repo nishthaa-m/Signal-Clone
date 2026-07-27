@@ -135,8 +135,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </button>
       )}
 
-      {/* Avatar for Received Messages in Group or Direct */}
-      {!isSentByMe && (
+      {/* Avatar for Received Messages in Group Chats ONLY */}
+      {!isSentByMe && isGroup && (
         <div
           onClick={handleSenderClick}
           className="cursor-pointer hover:opacity-85 transition-opacity mb-1 flex-shrink-0"

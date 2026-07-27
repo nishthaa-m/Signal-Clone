@@ -92,7 +92,7 @@ async def add_group_members(
     existing_res = await db.execute(existing_mems_stmt)
     existing_uids = set(existing_res.scalars().all())
 
-    new_uids = [uid for uid in req.user_ids if uid not in existing_uids]
+    new_uids = [uid for uid in req.target_user_ids if uid not in existing_uids]
     if not new_uids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
