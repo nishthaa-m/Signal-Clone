@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Users, LogOut, Menu, MessageSquare, Phone, Layers, Edit } from 'lucide-react';
 import { Conversation } from '@/lib/types';
 import { useAuthStore } from '@/lib/store/useAuthStore';
@@ -24,9 +24,14 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onOpenNewChat,
   onOpenNewGroup,
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
   const { user: currentUser, logout } = useAuthStore();
   const { searchQuery, setSearchQuery } = useChatStore();
   const [activeTab, setActiveTab] = useState<'chats' | 'calls' | 'stories'>('chats');
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const totalUnread = conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
 
@@ -65,7 +70,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               title="Chats"
             >
               <MessageSquare className="w-5 h-5 fill-current" />
-              {totalUnread > 0 && (
+              {isMounted && totalUnread > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-4 text-[10px] font-bold bg-rose-500 text-white rounded-full flex items-center justify-center px-1">
                   {totalUnread}
                 </span>
@@ -155,7 +160,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto py-2">
-          {activeTab !== 'chats' ? (
+          {!isMounted ? null : activeTab !== 'chats' ? (
             <div className="text-center text-gray-500 text-xs mt-10 px-4">
               <span className="font-semibold text-signal-text-primary uppercase block mb-1">{activeTab} - Coming Soon</span>
               Mocked Signal Desktop feature section

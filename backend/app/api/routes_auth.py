@@ -17,16 +17,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register_user(
     req: RegisterRequest, db: AsyncSession = Depends(get_db)
 ) -> OTPResponse:
-    """Initiate registration flow by requesting an OTP for phone number."""
-    return await auth_service.request_otp(db, req.phone_number)
+    """Initiate registration flow by requesting an OTP for phone number or username."""
+    return await auth_service.request_otp(db, req.phone_number, req.identifier or req.username)
 
 
 @router.post("/login", response_model=OTPResponse)
 async def login_user(
     req: LoginRequest, db: AsyncSession = Depends(get_db)
 ) -> OTPResponse:
-    """Initiate login flow by requesting an OTP for phone number."""
-    return await auth_service.request_otp(db, req.phone_number)
+    """Initiate login flow by requesting an OTP for phone number or username."""
+    return await auth_service.request_otp(db, req.phone_number, req.identifier)
 
 
 @router.post("/verify-otp", response_model=TokenResponse)
@@ -34,7 +34,7 @@ async def verify_otp_code(
     req: OTPVerifyRequest, db: AsyncSession = Depends(get_db)
 ) -> TokenResponse:
     """Verify OTP code (fixed 123456) and return JWT session token."""
-    return await auth_service.verify_otp(db, req.phone_number, req.otp)
+    return await auth_service.verify_otp(db, req.phone_number, req.identifier, req.otp)
 
 
 @router.post("/profile-setup", response_model=UserRead)

@@ -1,4 +1,4 @@
-import { Contact, Conversation, Message, MessageStatus, User } from './types';
+import { Contact, Conversation, Message, MessageStatus, Reaction, User } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -13,9 +13,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = typeof window !== 'undefined' ? localStorage.getItem('signal_token') : null;
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -60,6 +63,16 @@ export const apiClient = {
       body: JSON.stringify({ display_name: displayName, avatar_url: avatarUrl }),
     }),
 
+  // Uploads
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<{ url: string; attachment_type: string; filename: string }>('/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
   // Users & Contacts
   getMe: () => request<User>('/users/me'),
 
@@ -102,6 +115,12 @@ export const apiClient = {
       method: 'DELETE',
     }),
 
+  setDisappearingTimer: (id: number, timerSeconds: number) =>
+    request<Conversation>(`/conversations/${id}/disappearing-timer`, {
+      method: 'PATCH',
+      body: JSON.stringify({ timer_seconds: timerSeconds }),
+    }),
+
   markConversationRead: (id: number) =>
     request<MessageStatus[]>(`/conversations/${id}/read`, {
       method: 'PATCH',
@@ -111,10 +130,32 @@ export const apiClient = {
   getMessages: (conversationId: number) =>
     request<Message[]>(`/conversations/${conversationId}/messages`),
 
-  sendMessage: (conversationId: number, content: string) =>
+  sendMessage: (
+    conversationId: number,
+    content: string,
+    attachmentUrl?: string,
+    attachmentType?: string,
+    replyToId?: number
+  ) =>
     request<Message>(`/conversations/${conversationId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({
+        content,
+        attachment_url: attachmentUrl,
+        attachment_type: attachmentType,
+        reply_to_id: replyToId,
+      }),
+    }),
+
+  deleteMessage: (messageId: number) =>
+    request<{ message: string }>(`/messages/${messageId}`, {
+      method: 'DELETE',
+    }),
+
+  toggleReaction: (messageId: number, emoji: string) =>
+    request<Reaction[]>(`/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
     }),
 
   markMessageDelivered: (messageId: number) =>

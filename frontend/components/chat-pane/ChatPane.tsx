@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Phone, Video, MoreVertical, Lock, Users, Trash2, Sun, Moon, Eraser } from 'lucide-react';
+import { Phone, Video, MoreVertical, Lock, Users, Trash2, Sun, Moon, Eraser, Clock, Forward, CheckSquare, X } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
-import { Conversation } from '@/lib/types';
+import { Conversation, Message } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useChatStore } from '@/lib/store/useChatStore';
 import { Avatar } from '../ui/Avatar';
 import { MessageBubble } from '../message-bubble/MessageBubble';
 import { MessageInput } from './MessageInput';
+import { ForwardModal } from '../group/ForwardModal';
 import { useRouter } from 'next/navigation';
 
 interface ChatPaneProps {
@@ -17,6 +18,15 @@ interface ChatPaneProps {
   onOpenGroupDetails?: () => void;
   onShowComingSoon?: (feature: string) => void;
 }
+
+const TIMER_OPTIONS = [
+  { label: 'Off', seconds: 0 },
+  { label: '5 seconds', seconds: 5 },
+  { label: '30 seconds', seconds: 30 },
+  { label: '1 minute', seconds: 60 },
+  { label: '1 hour', seconds: 3600 },
+  { label: '1 day', seconds: 86400 },
+];
 
 function formatSignalLastSeen(lastSeenStr?: string): string {
   if (!lastSeenStr) return 'Offline';
@@ -65,6 +75,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     messagesMap,
     setMessages,
     addMessage,
+    deleteMessageLocally,
     clearMessages,
     removeConversation,
     conversations,
@@ -74,10 +85,16 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     presenceMap,
     theme,
     toggleTheme,
+    updateConversation,
   } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isTimerMenuOpen, setIsTimerMenuOpen] = useState(false);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
+  const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null);
+  const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const messages = messagesMap[conversation.id] || [];
@@ -130,18 +147,96 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false);
+        setIsTimerMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+    content: string,
+    attachmentUrl?: string,
+    attachmentType?: string,
+    replyToId?: number
+  ) => {
     try {
-      const newMsg = await apiClient.sendMessage(conversation.id, content);
+      const newMsg = await apiClient.sendMessage(
+        conversation.id,
+        content,
+        attachmentUrl,
+        attachmentType,
+        replyToId
+      );
       addMessage(newMsg);
     } catch (err) {
       console.error('Failed to send message:', err);
+    }
+  };
+
+  const handleToggleSelectMessage = (msgId: number) => {
+    if (selectedMessageIds.includes(msgId)) {
+      setSelectedMessageIds(selectedMessageIds.filter((id) => id !== msgId));
+    } else {
+      setSelectedMessageIds([...selectedMessageIds, msgId]);
+    }
+  };
+
+  const handleBulkDeleteForMe = () => {
+    selectedMessageIds.forEach((id) => {
+      deleteMessageLocally(conversation.id, id);
+    });
+    setSelectedMessageIds([]);
+    setIsSelectMode(false);
+  };
+
+  const handleTriggerForwardSingle = (msg: Message) => {
+    setForwardingMsg(msg);
+    setIsForwardModalOpen(true);
+  };
+
+  const handleTriggerForwardBulk = () => {
+    const targetMsg = messages.find((m) => selectedMessageIds.includes(m.id));
+    if (targetMsg) {
+      setForwardingMsg(targetMsg);
+      setIsForwardModalOpen(true);
+    }
+  };
+
+  const handleForwardToDestination = async (targetConvId: number) => {
+    if (!forwardingMsg && selectedMessageIds.length === 0) return;
+    const msgsToForward = forwardingMsg
+      ? [forwardingMsg]
+      : messages.filter((m) => selectedMessageIds.includes(m.id));
+
+    for (const msg of msgsToForward) {
+      try {
+        const sent = await apiClient.sendMessage(
+          targetConvId,
+          msg.content ? `[Forwarded] ${msg.content}` : '[Forwarded Attachment]',
+          msg.attachment_url,
+          msg.attachment_type
+        );
+        addMessage(sent);
+      } catch (err) {
+        console.error('Failed to forward message:', err);
+      }
+    }
+
+    setForwardingMsg(null);
+    setSelectedMessageIds([]);
+    setIsSelectMode(false);
+    setActiveConversationId(targetConvId);
+    router.push(`/chat/${targetConvId}`);
+  };
+
+  const handleSetTimer = async (seconds: number) => {
+    setIsTimerMenuOpen(false);
+    try {
+      const updatedConv = await apiClient.setDisappearingTimer(conversation.id, seconds);
+      updateConversation(updatedConv);
+    } catch (err) {
+      console.error('Failed to set disappearing timer:', err);
     }
   };
 
@@ -190,7 +285,45 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   const typingText = formatTypingText(typingUserIds, conversation.members);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-signal-dark overflow-hidden border-l border-signal-border">
+    <div className="flex-1 flex flex-col h-full bg-signal-dark overflow-hidden border-l border-signal-border relative">
+      {/* Floating Multi-Select Action Bar */}
+      {isSelectMode && (
+        <div className="absolute top-0 left-0 right-0 z-40 bg-signal-sidebar border-b border-signal-blue px-6 py-3 shadow-xl flex items-center justify-between animate-in slide-in-from-top-2">
+          <div className="flex items-center space-x-2 text-sm font-bold text-signal-text-primary">
+            <CheckSquare className="w-5 h-5 text-signal-blue" />
+            <span>{selectedMessageIds.length} message(s) selected</span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleTriggerForwardBulk}
+              disabled={selectedMessageIds.length === 0}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition-all"
+            >
+              <Forward className="w-4 h-4" />
+              <span>Forward</span>
+            </button>
+            <button
+              onClick={handleBulkDeleteForMe}
+              disabled={selectedMessageIds.length === 0}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete for me</span>
+            </button>
+            <button
+              onClick={() => {
+                setIsSelectMode(false);
+                setSelectedMessageIds([]);
+              }}
+              className="p-1.5 hover:bg-signal-hover rounded-full text-gray-400"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="h-16 px-4 bg-signal-sidebar border-b border-signal-border flex items-center justify-between flex-shrink-0">
         <div
@@ -207,6 +340,9 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
             <div className="flex items-center space-x-1.5 font-semibold text-sm text-signal-text-primary">
               <span>{displayName}</span>
               <Lock className="w-3.5 h-3.5 text-signal-blue" title="Encrypted" />
+              {conversation.disappearing_timer > 0 && (
+                <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse" title="Disappearing Messages Active" />
+              )}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
               {conversation.type === 'group' ? (
@@ -225,6 +361,38 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
 
         {/* Action icons & theme toggle */}
         <div className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 relative" ref={menuRef}>
+          {/* Disappearing Messages Timer Button */}
+          <button
+            onClick={() => setIsTimerMenuOpen(!isTimerMenuOpen)}
+            className={`p-2 hover:bg-signal-hover rounded-full transition-colors ${
+              conversation.disappearing_timer > 0 ? 'text-amber-500' : 'text-gray-400'
+            }`}
+            title="Disappearing Messages Timer"
+          >
+            <Clock className="w-5 h-5" />
+          </button>
+
+          {/* Disappearing Timer Menu */}
+          {isTimerMenuOpen && (
+            <div className="absolute right-20 top-12 w-48 bg-signal-sidebar border border-signal-border rounded-2xl shadow-2xl z-50 py-1 text-xs text-signal-text-primary">
+              <div className="px-3 py-1.5 font-bold text-signal-text-secondary border-b border-signal-border">
+                Disappearing Messages
+              </div>
+              {TIMER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.seconds}
+                  onClick={() => handleSetTimer(opt.seconds)}
+                  className={`w-full text-left px-4 py-2 hover:bg-signal-hover flex items-center justify-between ${
+                    (conversation.disappearing_timer || 0) === opt.seconds ? 'text-signal-blue font-bold' : ''
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {(conversation.disappearing_timer || 0) === opt.seconds && <span>✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
           <button
             onClick={toggleTheme}
             className="p-2 hover:bg-signal-hover rounded-full transition-colors text-amber-500 dark:text-amber-400"
@@ -267,10 +435,21 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
           {isMenuOpen && (
             <div className="absolute right-0 top-12 w-52 bg-signal-sidebar border border-signal-border rounded-2xl shadow-2xl z-50 py-1.5 text-xs text-signal-text-primary">
               <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setIsSelectMode(true);
+                }}
+                className="w-full flex items-center space-x-2 px-4 py-2.5 hover:bg-signal-hover transition-colors"
+              >
+                <CheckSquare className="w-4 h-4 text-amber-500" />
+                <span>Select Messages</span>
+              </button>
+
+              <button
                 onClick={handleClearHistory}
                 className="w-full flex items-center space-x-2 px-4 py-2.5 hover:bg-signal-hover transition-colors"
               >
-                <Eraser className="w-4 h-4 text-amber-500" />
+                <Eraser className="w-4 h-4 text-indigo-400" />
                 <span>Clear Chat History</span>
               </button>
 
@@ -310,6 +489,14 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
                 message={msg}
                 currentUserId={currentUser.id}
                 isGroup={conversation.type === 'group'}
+                isSelectMode={isSelectMode}
+                isSelected={selectedMessageIds.includes(msg.id)}
+                onToggleSelect={handleToggleSelectMessage}
+                onEnterSelectMode={() => {
+                  setIsSelectMode(true);
+                  setSelectedMessageIds([msg.id]);
+                }}
+                onForwardMessage={handleTriggerForwardSingle}
                 onOpenDirectChat={handleOpenDirectChat}
               />
             ))}
@@ -334,6 +521,17 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       <MessageInput
         conversationId={conversation.id}
         onSendMessage={handleSendMessage}
+      />
+
+      {/* Forward Modal */}
+      <ForwardModal
+        isOpen={isForwardModalOpen}
+        conversations={conversations}
+        onClose={() => {
+          setIsForwardModalOpen(false);
+          setForwardingMsg(null);
+        }}
+        onForwardToConversation={handleForwardToDestination}
       />
     </div>
   );

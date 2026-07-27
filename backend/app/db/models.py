@@ -108,6 +108,7 @@ class Conversation(Base):
     type: Mapped[ConversationType] = mapped_column(SQLEnum(ConversationType), default=ConversationType.DIRECT, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    disappearing_timer: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -152,13 +153,23 @@ class Message(Base):
     sender_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     message_type: Mapped[MessageType] = mapped_column(SQLEnum(MessageType), default=MessageType.TEXT, nullable=False)
+    attachment_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    attachment_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    reply_to_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 
     # Relationships
     conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
     sender: Mapped["User"] = relationship("User", back_populates="sent_messages")
+    reply_to: Mapped[Optional["Message"]] = relationship("Message", remote_side="Message.id", foreign_keys=[reply_to_id])
     statuses: Mapped[List["MessageStatus"]] = relationship(
         "MessageStatus",
+        back_populates="message",
+        cascade="all, delete-orphan",
+    )
+    reactions: Mapped[List["MessageReaction"]] = relationship(
+        "MessageReaction",
         back_populates="message",
         cascade="all, delete-orphan",
     )
@@ -179,4 +190,22 @@ class MessageStatus(Base):
     )
 
     message: Mapped["Message"] = relationship("Message", back_populates="statuses")
+    user: Mapped["User"] = relationship("User")
+
+
+class MessageReaction(Base):
+    """Emoji reaction attached to a message by a user."""
+    __tablename__ = "message_reactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    message_id: Mapped[int] = mapped_column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    emoji: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("message_id", "user_id", "emoji", name="uq_message_user_emoji"),
+    )
+
+    message: Mapped["Message"] = relationship("Message", back_populates="reactions")
     user: Mapped["User"] = relationship("User")

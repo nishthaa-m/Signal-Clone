@@ -1,4 +1,4 @@
-"""Seed data script pre-populating 5 realistic users, direct chats, a group chat, and messages."""
+"""Seed data script pre-populating 5 realistic users with 10-digit phone numbers, direct chats, a group chat, and messages."""
 
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,9 +28,9 @@ async def seed_database_if_empty(db: AsyncSession):
     print("[INFO] Database is empty. Seeding initial demo data...")
     now = datetime.now(timezone.utc)
 
-    # 1. Create 5 realistic users (is_online=False by default)
+    # 1. Create 5 realistic users with 10-digit phone numbers (is_online=False by default)
     alice = User(
-        phone_number="+15550001",
+        phone_number="+15550001001",
         username="alice_smith",
         display_name="Alice Smith",
         avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
@@ -38,7 +38,7 @@ async def seed_database_if_empty(db: AsyncSession):
         last_seen=now - timedelta(minutes=15),
     )
     bob = User(
-        phone_number="+15550002",
+        phone_number="+15550001002",
         username="bob_jones",
         display_name="Bob Jones",
         avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
@@ -46,7 +46,7 @@ async def seed_database_if_empty(db: AsyncSession):
         last_seen=now - timedelta(minutes=30),
     )
     charlie = User(
-        phone_number="+15550003",
+        phone_number="+15550001003",
         username="charlie_brown",
         display_name="Charlie Brown",
         avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie",
@@ -54,7 +54,7 @@ async def seed_database_if_empty(db: AsyncSession):
         last_seen=now - timedelta(hours=2),
     )
     diana = User(
-        phone_number="+15550004",
+        phone_number="+15550001004",
         username="diana_prince",
         display_name="Diana Prince",
         avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=Diana",
@@ -62,7 +62,7 @@ async def seed_database_if_empty(db: AsyncSession):
         last_seen=now - timedelta(days=1),
     )
     edward = User(
-        phone_number="+15550005",
+        phone_number="+15550001005",
         username="edward_snow",
         display_name="Edward Snow",
         avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=Edward",

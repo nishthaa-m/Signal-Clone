@@ -78,7 +78,7 @@ async def create_group(
 async def add_group_members(
     db: AsyncSession, current_user: User, conversation_id: int, req: GroupMemberAdd
 ) -> ConversationRead:
-    """Add new users to an existing group; requires caller to be an ADMIN."""
+    """Add new members to an existing group; requires caller to be an ADMIN."""
     caller_mem = await get_group_member_role(db, conversation_id, current_user.id)
     if not caller_mem or caller_mem.role != MemberRole.ADMIN:
         raise HTTPException(
@@ -242,13 +242,19 @@ async def get_group_conversation_read(
             detail="Group conversation not found",
         )
 
+    now = datetime.now(timezone.utc)
     last_msg_stmt = (
         select(Message)
         .options(
             selectinload(Message.sender),
             selectinload(Message.statuses),
+            selectinload(Message.reactions),
+            selectinload(Message.reply_to).selectinload(Message.sender),
         )
-        .where(Message.conversation_id == conv.id)
+        .where(
+            Message.conversation_id == conv.id,
+            (Message.expires_at == None) | (Message.expires_at > now),
+        )
         .order_by(Message.created_at.desc())
         .limit(1)
     )
@@ -260,6 +266,7 @@ async def get_group_conversation_read(
         type=conv.type,
         name=conv.name,
         avatar_url=conv.avatar_url,
+        disappearing_timer=conv.disappearing_timer,
         created_at=conv.created_at,
         updated_at=conv.updated_at,
         members=[ConversationMemberRead.model_validate(m) for m in conv.members],

@@ -1,28 +1,38 @@
 """Main FastAPI application factory and entry point."""
 
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.api import routes_auth, routes_conversations, routes_groups, routes_users, routes_ws
+from app.api import (
+    routes_auth,
+    routes_conversations,
+    routes_groups,
+    routes_uploads,
+    routes_users,
+    routes_ws,
+)
 from app.core.config import settings
-from app.db.base import Base, engine, AsyncSessionLocal
+from app.db.base import AsyncSessionLocal, Base, engine
 from app.db.seed import seed_database_if_empty
+
+# Local uploads directory
+UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/public/uploads"))
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage startup and shutdown events for the application."""
-    # Ensure all tables are created on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Automatically seed database if empty
     async with AsyncSessionLocal() as session:
         await seed_database_if_empty(session)
 
     yield
-    # Clean up database connection on shutdown
     await engine.dispose()
 
 
@@ -36,7 +46,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configure CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -45,12 +54,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Mount static files for uploads
+    app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
     # Mount API routers
     app.include_router(routes_auth.router)
     app.include_router(routes_users.router)
     app.include_router(routes_conversations.router)
     app.include_router(routes_conversations.messages_router)
     app.include_router(routes_groups.router)
+    app.include_router(routes_uploads.router)
     app.include_router(routes_ws.router)
 
     @app.get("/api/health")

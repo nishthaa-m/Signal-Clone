@@ -1,5 +1,6 @@
 """Service module managing conversation listing, 1:1 chat initialization, conversation details, and deletion."""
 
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_
@@ -7,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from app.core.ws_manager import ws_manager
 from app.db.models import (
     Conversation,
     ConversationMember,
@@ -47,6 +49,8 @@ async def get_user_conversations(
 
     results: List[ConversationRead] = []
     clean_query = search_query.strip().lower() if search_query else None
+    seen_direct_uids = set()
+    now = datetime.now(timezone.utc)
 
     for conv in conversations:
         display_name = conv.name
@@ -57,6 +61,11 @@ async def get_user_conversations(
                 (m for m in conv.members if m.user_id != current_user.id), None
             )
             if other_member and other_member.user:
+                # Deduplicate direct 1:1 chats by other user ID
+                if other_member.user_id in seen_direct_uids:
+                    continue
+                seen_direct_uids.add(other_member.user_id)
+
                 display_name = (
                     other_member.user.display_name
                     or other_member.user.username
@@ -79,13 +88,19 @@ async def get_user_conversations(
             if not (matches_name or matches_member):
                 continue
 
+        # Filter last_message by non-expired messages
         last_msg_stmt = (
             select(Message)
             .options(
                 selectinload(Message.sender),
                 selectinload(Message.statuses),
+                selectinload(Message.reactions),
+                selectinload(Message.reply_to).selectinload(Message.sender),
             )
-            .where(Message.conversation_id == conv.id)
+            .where(
+                Message.conversation_id == conv.id,
+                (Message.expires_at == None) | (Message.expires_at > now),
+            )
             .order_by(Message.created_at.desc())
             .limit(1)
         )
@@ -109,6 +124,7 @@ async def get_user_conversations(
             type=conv.type,
             name=display_name,
             avatar_url=display_avatar,
+            disappearing_timer=conv.disappearing_timer,
             created_at=conv.created_at,
             updated_at=conv.updated_at,
             members=[ConversationMemberRead.model_validate(m) for m in conv.members],
@@ -139,18 +155,21 @@ async def get_or_create_direct_conversation(
             detail="Recipient user not found",
         )
 
+    c1_alias = select(ConversationMember.conversation_id).where(ConversationMember.user_id == current_user.id)
+    c2_alias = select(ConversationMember.conversation_id).where(ConversationMember.user_id == recipient_id)
+
     stmt = (
         select(Conversation)
         .options(
             selectinload(Conversation.members).selectinload(ConversationMember.user)
         )
-        .join(ConversationMember)
         .where(
             Conversation.type == ConversationType.DIRECT,
-            ConversationMember.user_id.in_([current_user.id, recipient_id]),
+            Conversation.id.in_(c1_alias),
+            Conversation.id.in_(c2_alias),
         )
-        .group_by(Conversation.id)
-        .having(func.count(ConversationMember.user_id) == 2)
+        .order_by(Conversation.created_at.asc())
+        .limit(1)
     )
     res = await db.execute(stmt)
     conv = res.scalar_one_or_none()
@@ -166,30 +185,7 @@ async def get_or_create_direct_conversation(
         db.add_all([mem1, mem2])
         await db.commit()
 
-        stmt_full = (
-            select(Conversation)
-            .options(
-                selectinload(Conversation.members).selectinload(ConversationMember.user)
-            )
-            .where(Conversation.id == conv.id)
-        )
-        res_full = await db.execute(stmt_full)
-        conv = res_full.scalar_one()
-
-    display_name = recipient.display_name or recipient.username or recipient.phone_number
-    display_avatar = recipient.avatar_url
-
-    return ConversationRead(
-        id=conv.id,
-        type=conv.type,
-        name=display_name,
-        avatar_url=display_avatar,
-        created_at=conv.created_at,
-        updated_at=conv.updated_at,
-        members=[ConversationMemberRead.model_validate(m) for m in conv.members],
-        last_message=None,
-        unread_count=0,
-    )
+    return await get_conversation_by_id(db, current_user, conv.id)
 
 
 async def get_conversation_by_id(
@@ -239,13 +235,19 @@ async def get_conversation_by_id(
         else:
             display_name = "Note to Self"
 
+    now = datetime.now(timezone.utc)
     last_msg_stmt = (
         select(Message)
         .options(
             selectinload(Message.sender),
             selectinload(Message.statuses),
+            selectinload(Message.reactions),
+            selectinload(Message.reply_to).selectinload(Message.sender),
         )
-        .where(Message.conversation_id == conv.id)
+        .where(
+            Message.conversation_id == conv.id,
+            (Message.expires_at == None) | (Message.expires_at > now),
+        )
         .order_by(Message.created_at.desc())
         .limit(1)
     )
@@ -269,6 +271,7 @@ async def get_conversation_by_id(
         type=conv.type,
         name=display_name,
         avatar_url=display_avatar,
+        disappearing_timer=conv.disappearing_timer,
         created_at=conv.created_at,
         updated_at=conv.updated_at,
         members=[ConversationMemberRead.model_validate(m) for m in conv.members],
@@ -280,7 +283,7 @@ async def get_conversation_by_id(
 async def clear_conversation_messages(
     db: AsyncSession, current_user: User, conversation_id: int
 ) -> dict[str, str]:
-    """Delete all messages inside a conversation (clear chat history)."""
+    """Delete all messages inside a conversation (clear chat history) and broadcast WebSocket notification."""
     mem_stmt = select(ConversationMember).where(
         ConversationMember.conversation_id == conversation_id,
         ConversationMember.user_id == current_user.id,
@@ -292,6 +295,12 @@ async def clear_conversation_messages(
             detail="User is not a member of this conversation",
         )
 
+    all_mems_stmt = select(ConversationMember.user_id).where(
+        ConversationMember.conversation_id == conversation_id
+    )
+    all_mems_res = await db.execute(all_mems_stmt)
+    member_uids = list(all_mems_res.scalars().all())
+
     msgs_stmt = select(Message).where(Message.conversation_id == conversation_id)
     msgs_res = await db.execute(msgs_stmt)
     msgs = msgs_res.scalars().all()
@@ -300,6 +309,13 @@ async def clear_conversation_messages(
         await db.delete(m)
 
     await db.commit()
+
+    payload = {
+        "type": "conversation:clear",
+        "conversation_id": conversation_id,
+    }
+    await ws_manager.broadcast_to_users(member_uids, payload)
+
     return {"message": "Chat history cleared successfully"}
 
 

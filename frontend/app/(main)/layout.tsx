@@ -9,6 +9,7 @@ import { wsClient } from '@/lib/ws-client';
 import { ConversationList } from '@/components/conversation-list/ConversationList';
 import { NewChatModal } from '@/components/group/NewChatModal';
 import { NewGroupModal } from '@/components/group/NewGroupModal';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { ShieldAlert } from 'lucide-react';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -26,17 +27,22 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     openGroupModal,
     handleWSEvent,
     initTheme,
+    purgeExpiredMessages,
   } = useChatStore();
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Mount keyboard shortcuts hook
+  useKeyboardShortcuts();
 
   useEffect(() => {
     initAuth();
     initTheme();
   }, [initAuth, initTheme]);
 
+  // Persistent WebSocket Connection across route changes
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && typeof window !== 'undefined' && !localStorage.getItem('signal_token')) {
       router.push('/register');
       return;
     }
@@ -61,7 +67,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         unsubscribe();
       };
     }
-  }, [isAuthenticated, token, router, setConversations, handleWSEvent, setActiveConversationId, pathname]);
+  }, [isAuthenticated, token, router, setConversations, handleWSEvent, setActiveConversationId]);
+
+  // Periodic 1-second auto-purge loop for expiring disappearing messages
+  useEffect(() => {
+    const timer = setInterval(() => {
+      purgeExpiredMessages();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [purgeExpiredMessages]);
 
   const handleSelectConversation = (id: number) => {
     setActiveConversationId(id);
@@ -92,15 +106,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const showComingSoonToast = (featureName: string) => {
-    setToastMessage(`${featureName} - Coming Soon!`);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  if (!isAuthenticated) {
+  if (!isAuthenticated && typeof window !== 'undefined' && !localStorage.getItem('signal_token')) {
     return (
-      <div className="h-screen bg-signal-dark flex items-center justify-center text-gray-400">
-        Loading Signal Messenger...
+      <div className="h-screen w-screen bg-signal-dark flex flex-col items-center justify-center text-gray-400 space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-signal-blue flex items-center justify-center text-white text-2xl font-bold animate-pulse">
+          💬
+        </div>
+        <span className="text-sm font-medium">Redirecting to Signal Login...</span>
       </div>
     );
   }

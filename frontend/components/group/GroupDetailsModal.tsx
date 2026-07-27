@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { X, Shield, UserMinus, UserPlus, LogOut } from 'lucide-react';
 import { Conversation, Contact } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/store/useAuthStore';
+import { useChatStore } from '@/lib/store/useChatStore';
 import { Avatar } from '../ui/Avatar';
 
 interface GroupDetailsModalProps {
@@ -20,7 +22,9 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   onClose,
   onUpdateGroup,
 }) => {
+  const router = useRouter();
   const { user: currentUser } = useAuthStore();
+  const { removeConversation } = useChatStore();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
@@ -37,9 +41,23 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
   const handleRemove = async (targetUserId: number) => {
     try {
+      const isSelf = targetUserId === currentUser?.id;
       const updated = await apiClient.removeGroupMember(conversation.id, targetUserId);
-      onUpdateGroup(updated);
+      if (isSelf) {
+        removeConversation(conversation.id);
+        onClose();
+        router.push('/');
+      } else {
+        onUpdateGroup(updated);
+      }
     } catch (err: unknown) {
+      const isSelf = targetUserId === currentUser?.id;
+      if (isSelf) {
+        removeConversation(conversation.id);
+        onClose();
+        router.push('/');
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Failed to remove member';
       setError(msg);
     }
