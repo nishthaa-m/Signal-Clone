@@ -56,11 +56,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setIsUploading(true);
     try {
       const res = await apiClient.uploadFile(file);
-      const fileType = res.content_type?.startsWith('image/') ? 'image' : 'file';
+      const url = res.url || res.file_url;
+      const fileType =
+        res.attachment_type === 'image' ||
+        res.content_type?.startsWith('image/') ||
+        file.type?.startsWith('image/')
+          ? 'image'
+          : 'file';
       setAttachment({
-        url: res.file_url,
+        url,
         type: fileType,
-        name: res.filename,
+        name: res.filename || file.name,
       });
     } catch (err) {
       console.error('Failed to upload file:', err);

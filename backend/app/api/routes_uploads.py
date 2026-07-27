@@ -38,6 +38,8 @@ async def upload_attachment(
 
     return {
         "url": file_url,
+        "file_url": file_url,
         "attachment_type": attachment_type,
+        "content_type": file.content_type or attachment_type,
         "filename": file.filename,
     }

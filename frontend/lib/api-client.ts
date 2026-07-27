@@ -76,7 +76,8 @@ export const apiClient = {
 
   // Users & Contacts
   getContacts: () => request<User[]>('/users/contacts'),
-  searchUsers: (query: string) => request<User[]>(`/users/search?q=${encodeURIComponent(query)}`),
+  searchUsers: (query?: string) =>
+    request<User[]>(`/users/search${query ? `?q=${encodeURIComponent(query)}` : ''}`),
 
   // Conversations
   getConversations: (query?: string) =>

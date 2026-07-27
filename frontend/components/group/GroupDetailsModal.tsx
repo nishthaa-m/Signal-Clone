@@ -35,16 +35,22 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      apiClient.searchUsers('')
-        .then(setAvailableUsers)
-        .catch(() => {
-          apiClient.getContacts().then((contacts: any[]) => {
-            const users = contacts.map((c) => c.contact_user || c);
-            setAvailableUsers(users);
-          }).catch(console.error);
+      Promise.all([
+        apiClient.searchUsers('').catch(() => []),
+        apiClient.getContacts().catch(() => []),
+      ]).then(([searched, contacts]) => {
+        const contactUsers = (contacts as any[]).map((c) => c.contact_user || c);
+        const combined = [...searched, ...contactUsers];
+        const uniqueUsersMap = new Map<number, User>();
+        combined.forEach((u) => {
+          if (u && u.id && Number(u.id) !== Number(currentUser?.id)) {
+            uniqueUsersMap.set(Number(u.id), u);
+          }
         });
+        setAvailableUsers(Array.from(uniqueUsersMap.values()));
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser?.id]);
 
   const handleRemove = async (targetUserId: number) => {
     try {
@@ -132,9 +138,9 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
                   <label key={u.id} className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedUserIds.includes(u.id)}
+                      checked={selectedUserIds.includes(Number(u.id))}
                       onChange={(e) => {
-                        const uid = u.id;
+                        const uid = Number(u.id);
                         setSelectedUserIds((prev) =>
                           e.target.checked ? [...prev, uid] : prev.filter((id) => id !== uid)
                         );

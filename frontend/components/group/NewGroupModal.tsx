@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
-import { Contact } from '@/lib/types';
+import { User } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
+import { useAuthStore } from '@/lib/store/useAuthStore';
 import { Avatar } from '../ui/Avatar';
 
 interface NewGroupModalProps {
@@ -17,22 +18,37 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
   onClose,
   onCreateGroup,
 }) => {
+  const { user: currentUser } = useAuthStore();
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      apiClient.getContacts().then(setContacts).catch(console.error);
+      Promise.all([
+        apiClient.searchUsers('').catch(() => []),
+        apiClient.getContacts().catch(() => []),
+      ]).then(([searched, contacts]) => {
+        const contactUsers = (contacts as any[]).map((c) => c.contact_user || c);
+        const combined = [...searched, ...contactUsers];
+        const uniqueUsersMap = new Map<number, User>();
+        combined.forEach((u) => {
+          if (u && u.id && Number(u.id) !== Number(currentUser?.id)) {
+            uniqueUsersMap.set(Number(u.id), u);
+          }
+        });
+        setAvailableUsers(Array.from(uniqueUsersMap.values()));
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser?.id]);
 
   const toggleSelect = (userId: number) => {
+    const uid = Number(userId);
     setSelectedUserIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
     );
   };
 
@@ -101,30 +117,31 @@ export const NewGroupModal: React.FC<NewGroupModalProps> = ({
 
           <div className="flex-1 overflow-y-auto p-3">
             <div className="text-[11px] font-semibold text-gray-400 px-1 mb-2 uppercase">Select Group Members ({selectedUserIds.length})</div>
-            {contacts.length === 0 ? (
-              <div className="text-xs text-gray-500 p-4 text-center">No saved contacts available</div>
+            {availableUsers.length === 0 ? (
+              <div className="text-xs text-gray-500 p-4 text-center">No available users found</div>
             ) : (
-              contacts.map((c) => {
-                const isSelected = selectedUserIds.includes(c.contact_user_id);
+              availableUsers.map((u) => {
+                const uid = Number(u.id);
+                const isSelected = selectedUserIds.includes(uid);
                 return (
                   <div
-                    key={c.id}
-                    onClick={() => toggleSelect(c.contact_user_id)}
+                    key={uid}
+                    onClick={() => toggleSelect(uid)}
                     className={`flex items-center justify-between p-2.5 my-1 rounded-xl cursor-pointer transition-colors ${
                       isSelected ? 'bg-signal-hover border border-signal-blue/50' : 'hover:bg-signal-hover/50'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
                       <Avatar
-                        name={c.nickname || c.contact_user.display_name || c.contact_user.username}
-                        src={c.contact_user.avatar_url}
+                        name={u.display_name || u.username || u.phone_number}
+                        src={u.avatar_url}
                         size="md"
                       />
                       <div>
                         <div className="text-xs font-semibold text-signal-text-primary">
-                          {c.nickname || c.contact_user.display_name || c.contact_user.username}
+                          {u.display_name || u.username || u.phone_number}
                         </div>
-                        <div className="text-[11px] text-gray-400">{c.contact_user.phone_number}</div>
+                        <div className="text-[11px] text-gray-400">{u.phone_number}</div>
                       </div>
                     </div>
 
