@@ -1,6 +1,6 @@
 """Service module handling user profile queries, search, and contact list operations."""
 
-from typing import List
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,12 +43,15 @@ async def update_me(
 
 
 async def search_users(
-    db: AsyncSession, current_user: User, query: str
+    db: AsyncSession, current_user: User, query: Optional[str] = None
 ) -> List[UserRead]:
     """Search for registered users by phone number, username, or display name."""
-    clean_query = query.strip()
+    clean_query = query.strip() if query else ""
     if not clean_query:
-        return []
+        stmt = select(User).where(User.id != current_user.id).limit(50)
+        result = await db.execute(stmt)
+        users = result.scalars().all()
+        return [UserRead.model_validate(u) for u in users]
 
     stmt = (
         select(User)

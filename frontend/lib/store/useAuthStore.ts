@@ -18,6 +18,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setAuth: (user, token) => {
     if (typeof window !== 'undefined') {
+      sessionStorage.setItem('signal_token', token);
+      sessionStorage.setItem('signal_user', JSON.stringify(user));
       localStorage.setItem('signal_token', token);
       localStorage.setItem('signal_user', JSON.stringify(user));
     }
@@ -29,6 +31,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (!state.user) return state;
       const updated = { ...state.user, ...partialUser };
       if (typeof window !== 'undefined') {
+        sessionStorage.setItem('signal_user', JSON.stringify(updated));
         localStorage.setItem('signal_user', JSON.stringify(updated));
       }
       return { user: updated };
@@ -37,6 +40,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('signal_token');
+      sessionStorage.removeItem('signal_user');
       localStorage.removeItem('signal_token');
       localStorage.removeItem('signal_user');
     }
@@ -45,13 +50,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initAuth: () => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('signal_token');
-      const userStr = localStorage.getItem('signal_user');
+      const token = sessionStorage.getItem('signal_token') || localStorage.getItem('signal_token');
+      const userStr = sessionStorage.getItem('signal_user') || localStorage.getItem('signal_user');
       if (token && userStr) {
         try {
           const user: User = JSON.parse(userStr);
           set({ user, token, isAuthenticated: true });
         } catch {
+          sessionStorage.removeItem('signal_token');
+          sessionStorage.removeItem('signal_user');
           localStorage.removeItem('signal_token');
           localStorage.removeItem('signal_user');
         }

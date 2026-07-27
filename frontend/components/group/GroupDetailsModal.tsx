@@ -37,7 +37,12 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
     if (isOpen) {
       apiClient.searchUsers('')
         .then(setAvailableUsers)
-        .catch(() => apiClient.getContacts().then(setAvailableUsers).catch(console.error));
+        .catch(() => {
+          apiClient.getContacts().then((contacts: any[]) => {
+            const users = contacts.map((c) => c.contact_user || c);
+            setAvailableUsers(users);
+          }).catch(console.error);
+        });
     }
   }, [isOpen]);
 
@@ -82,7 +87,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
   // Filter users not already in group
   const existingMemberUserIds = new Set(conversation.members.map((m) => Number(m.user_id)));
-  const addableUsers = availableUsers.filter((u) => !existingMemberUserIds.has(Number(u.id)));
+  const addableUsers = availableUsers.filter((u) => u && u.id && !existingMemberUserIds.has(Number(u.id)));
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
