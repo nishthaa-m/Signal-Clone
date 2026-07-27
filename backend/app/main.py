@@ -18,8 +18,11 @@ from app.core.config import settings
 from app.db.base import AsyncSessionLocal, Base, engine
 from app.db.seed import seed_database_if_empty
 
-# Local uploads directory
-UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/public/uploads"))
+# Uploads directory fallback for cloud hosting (Railway)
+UPLOADS_DIR = os.getenv(
+    "UPLOADS_DIR",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/public/uploads"))
+)
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 
@@ -48,7 +51,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

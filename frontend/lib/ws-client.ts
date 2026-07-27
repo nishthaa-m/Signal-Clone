@@ -1,6 +1,12 @@
 import { WSEvent } from './types';
 
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+function getWsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  return apiUrl.replace(/^http/, 'ws');
+}
+
+const WS_BASE_URL = getWsUrl();
 
 type EventCallback = (event: WSEvent) => void;
 
