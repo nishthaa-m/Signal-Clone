@@ -1,7 +1,7 @@
 import { Contact, Conversation, Message, MessageStatus, Reaction, User } from './types';
 
 const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
+export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 class ApiError extends Error {
   constructor(public status: number, public detail: string) {
@@ -86,6 +86,12 @@ export const apiClient = {
       body: JSON.stringify({ recipient_id: recipientId }),
     }),
 
+  createDirectConversation: (recipientId: number) =>
+    request<Conversation>('/conversations/direct', {
+      method: 'POST',
+      body: JSON.stringify({ recipient_id: recipientId }),
+    }),
+
   getConversationDetail: (conversationId: number) =>
     request<Conversation>(`/conversations/${conversationId}`),
 
@@ -100,6 +106,12 @@ export const apiClient = {
     }),
 
   updateDisappearingTimer: (conversationId: number, timerSeconds: number) =>
+    request<Conversation>(`/conversations/${conversationId}/disappearing-timer`, {
+      method: 'PATCH',
+      body: JSON.stringify({ timer_seconds: timerSeconds }),
+    }),
+
+  setDisappearingTimer: (conversationId: number, timerSeconds: number) =>
     request<Conversation>(`/conversations/${conversationId}/disappearing-timer`, {
       method: 'PATCH',
       body: JSON.stringify({ timer_seconds: timerSeconds }),

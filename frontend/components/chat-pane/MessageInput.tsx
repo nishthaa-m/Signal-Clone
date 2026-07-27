@@ -56,9 +56,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setIsUploading(true);
     try {
       const res = await apiClient.uploadFile(file);
+      const fileType = res.content_type?.startsWith('image/') ? 'image' : 'file';
       setAttachment({
-        url: res.url,
-        type: res.attachment_type,
+        url: res.file_url,
+        type: fileType,
         name: res.filename,
       });
     } catch (err) {
@@ -99,61 +100,60 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className="bg-signal-sidebar border-t border-signal-border p-3 relative flex-shrink-0">
-      {/* 1. Quoted Reply Preview Bar */}
+    <div className="border-t border-signal-border bg-signal-sidebar p-3 relative">
+      {/* Quoted Reply Banner */}
       {replyingToMessage && (
-        <div className="mb-2 p-2.5 bg-signal-card border-l-4 border-signal-blue rounded-r-xl flex items-center justify-between text-xs shadow-xs">
-          <div className="min-w-0 pr-2">
+        <div className="mb-2 bg-signal-card border-l-4 border-signal-blue p-2.5 rounded-r-xl flex items-center justify-between animate-in slide-in-from-bottom-1">
+          <div className="text-xs space-y-0.5 overflow-hidden">
             <span className="font-bold text-signal-blue block">
-              Replying to {replyingToMessage.sender?.display_name || replyingToMessage.sender?.username || 'User'}
+              Replying to {replyingToMessage.sender?.display_name || 'User'}
             </span>
-            <span className="text-signal-text-secondary truncate block">
+            <p className="text-signal-text-secondary truncate">
               {replyingToMessage.content || '[Attachment]'}
-            </span>
+            </p>
           </div>
           <button
             onClick={() => setReplyingToMessage(null)}
-            className="p-1 hover:bg-signal-hover rounded-full text-gray-400 hover:text-signal-text-primary"
-            title="Cancel Reply"
+            className="p-1 text-gray-400 hover:text-white rounded-full"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* 2. Attachment Preview Bar */}
+      {/* Attachment Preview Banner */}
       {attachment && (
-        <div className="mb-2 p-2 bg-signal-card border border-signal-border rounded-xl flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2 truncate">
+        <div className="mb-2 bg-signal-card border border-signal-border p-2.5 rounded-xl flex items-center justify-between">
+          <div className="flex items-center space-x-2.5 overflow-hidden">
             {attachment.type === 'image' ? (
-              <ImageIcon className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <ImageIcon className="w-5 h-5 text-signal-blue flex-shrink-0" />
             ) : (
-              <FileText className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+              <FileText className="w-5 h-5 text-emerald-400 flex-shrink-0" />
             )}
-            <span className="text-signal-text-primary truncate font-medium">{attachment.name}</span>
+            <span className="text-xs font-medium text-signal-text-primary truncate">
+              {attachment.name}
+            </span>
           </div>
           <button
             onClick={() => setAttachment(null)}
-            className="p-1 hover:bg-signal-hover rounded-full text-gray-400 hover:text-signal-text-primary"
-            title="Remove Attachment"
+            className="p-1 text-gray-400 hover:text-white rounded-full"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* 3. Emoji Quick Picker */}
+      {/* Emoji Picker Popup */}
       {isEmojiOpen && (
-        <div className="absolute bottom-16 left-4 bg-signal-sidebar border border-signal-border rounded-2xl shadow-2xl p-2 z-50 flex items-center space-x-1.5 animate-in fade-in zoom-in-95">
+        <div className="absolute bottom-16 left-4 z-50 bg-signal-sidebar border border-signal-border rounded-2xl p-2 shadow-2xl flex items-center space-x-1 animate-in fade-in-50 zoom-in-95">
           {EMOJI_LIST.map((emoji) => (
             <button
               key={emoji}
-              type="button"
               onClick={() => {
                 setContent((prev) => prev + emoji);
                 setIsEmojiOpen(false);
               }}
-              className="p-1.5 hover:bg-signal-hover rounded-xl text-lg transition-transform hover:scale-125"
+              className="p-1.5 hover:bg-signal-hover rounded-xl text-lg hover:scale-125 transition-transform"
             >
               {emoji}
             </button>
@@ -161,8 +161,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
 
-      {/* 4. Main Input Form */}
       <form onSubmit={handleSend} className="flex items-center space-x-2">
+        {/* Hidden File Input */}
         <input
           type="file"
           ref={fileInputRef}
@@ -174,17 +174,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="p-2.5 hover:bg-signal-hover text-gray-400 hover:text-signal-text-primary rounded-full transition-colors relative"
-          title="Attach Image or File"
+          className="p-2.5 text-signal-text-secondary hover:text-signal-blue hover:bg-signal-hover rounded-full transition-colors disabled:opacity-50"
+          title="Attach file or image"
         >
-          <Paperclip className={`w-5 h-5 ${isUploading ? 'animate-spin text-signal-blue' : ''}`} />
+          <Paperclip className="w-5 h-5" />
         </button>
 
         <button
           type="button"
           onClick={() => setIsEmojiOpen(!isEmojiOpen)}
-          className="p-2.5 hover:bg-signal-hover text-gray-400 hover:text-signal-text-primary rounded-full transition-colors"
-          title="Add Emoji"
+          className="p-2.5 text-signal-text-secondary hover:text-amber-400 hover:bg-signal-hover rounded-full transition-colors"
+          title="Insert Emoji"
         >
           <Smile className="w-5 h-5" />
         </button>
@@ -196,14 +196,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder="Signal message..."
             rows={1}
-            className="w-full bg-signal-card text-signal-text-primary border border-signal-border rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-signal-blue resize-none transition-all placeholder:text-gray-500"
+            className="w-full bg-signal-card text-signal-text-primary placeholder-signal-text-secondary border border-signal-border rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-signal-blue resize-none max-h-32 transition-colors"
           />
         </div>
 
         <button
           type="submit"
           disabled={!content.trim() && !attachment}
-          className="p-2.5 bg-signal-blue text-white rounded-full hover:bg-blue-600 disabled:opacity-40 disabled:hover:bg-signal-blue transition-all shadow-md flex-shrink-0"
+          className="p-2.5 bg-signal-blue hover:bg-blue-600 text-white rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md hover:scale-105 active:scale-95"
           title="Send Message"
         >
           <Send className="w-4 h-4 fill-current" />

@@ -7,6 +7,7 @@ import { Message } from '@/lib/types';
 import { StatusCheck } from '../ui/StatusCheck';
 import { Avatar } from '../ui/Avatar';
 import { useChatStore } from '@/lib/store/useChatStore';
+import { API_BASE_URL, apiClient } from '@/lib/api-client';
 
 interface MessageBubbleProps {
   message: Message;
@@ -51,7 +52,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [showActionMenu, setShowActionMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isSentByMe = message.sender_id === currentUserId;
+  const isSentByMe = Number(message.sender_id) === Number(currentUserId);
   const isSystemMsg = message.message_type === 'system';
 
   useEffect(() => {
@@ -89,54 +90,56 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const handleToggleReaction = async (emoji: string) => {
     setShowEmojiPicker(false);
-    setShowActionMenu(false);
-    const existing = (message.reactions || []).filter(r => r.user_id !== currentUserId || r.emoji !== emoji);
-    if ((message.reactions || []).some(r => r.user_id === currentUserId && r.emoji === emoji)) {
-      updateMessageReactions(message.conversation_id, message.id, existing);
-    } else {
-      updateMessageReactions(message.conversation_id, message.id, [
-        ...existing,
-        { id: Date.now(), message_id: message.id, user_id: currentUserId, emoji, created_at: new Date().toISOString() },
-      ]);
+    try {
+      const updatedReactions = await apiClient.toggleReaction(message.id, emoji);
+      updateMessageReactions(message.conversation_id, message.id, updatedReactions);
+    } catch (err) {
+      console.error('Failed to toggle reaction:', err);
     }
   };
 
-  const handleDeleteForMe = () => {
+  const handleDeleteForMe = async () => {
     setShowActionMenu(false);
-    deleteMessageLocally(message.conversation_id, message.id);
+    try {
+      await apiClient.deleteSingleMessage(message.id);
+      deleteMessageLocally(message.conversation_id, message.id);
+    } catch (err) {
+      console.error('Failed to delete message for me:', err);
+      deleteMessageLocally(message.conversation_id, message.id);
+    }
   };
 
-  const reactionGroups = (message.reactions || []).reduce<Record<string, { count: number; hasReacted: boolean }>>(
-    (acc, r) => {
-      if (!acc[r.emoji]) {
-        acc[r.emoji] = { count: 0, hasReacted: false };
-      }
-      acc[r.emoji].count += 1;
-      if (r.user_id === currentUserId) {
-        acc[r.emoji].hasReacted = true;
-      }
-      return acc;
-    },
-    {}
-  );
+  const fullAttachmentUrl = message.attachment_url
+    ? message.attachment_url.startsWith('http')
+      ? message.attachment_url
+      : `${API_BASE_URL}${message.attachment_url}`
+    : '';
 
   return (
-    <div className={`flex my-1 space-x-2 group relative items-end ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
-      {/* Checkbox for Select Mode */}
+    <div
+      className={`group flex items-end space-x-2 my-1.5 relative ${
+        isSentByMe ? 'justify-end' : 'justify-start'
+      }`}
+    >
+      {/* Multi-Select Checkbox */}
       {isSelectMode && (
         <button
           onClick={() => onToggleSelect?.(message.id)}
-          className="p-1 text-signal-blue self-center flex-shrink-0"
+          className="self-center p-1 text-signal-blue hover:scale-110 transition-transform"
         >
-          {isSelected ? <CheckSquare className="w-5 h-5 fill-current" /> : <Square className="w-5 h-5 text-gray-400" />}
+          {isSelected ? (
+            <CheckSquare className="w-5 h-5 fill-current" />
+          ) : (
+            <Square className="w-5 h-5 text-gray-400" />
+          )}
         </button>
       )}
 
-      {/* Show Avatar next to received group messages */}
-      {!isSentByMe && isGroup && (
+      {/* Avatar for Received Messages in Group or Direct */}
+      {!isSentByMe && (
         <div
           onClick={handleSenderClick}
-          className="cursor-pointer hover:opacity-80 transition-opacity mb-1 flex-shrink-0"
+          className="cursor-pointer hover:opacity-85 transition-opacity mb-1 flex-shrink-0"
           title={`Click to chat with ${senderName}`}
         >
           <Avatar
@@ -190,7 +193,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
 
-          {/* Context Menu Dropdown - Dynamic top-full positioning so it never clips at the top! */}
+          {/* Context Menu Dropdown */}
           {showActionMenu && (
             <div className="absolute top-full mt-1.5 z-50 w-44 bg-signal-sidebar border border-signal-border rounded-2xl shadow-2xl py-1 text-xs text-signal-text-primary">
               <button
@@ -277,18 +280,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         {/* Attachment Renderer */}
-        {message.attachment_url && (
+        {fullAttachmentUrl && (
           <div className="mb-2">
             {message.attachment_type === 'image' ? (
               <img
-                src={message.attachment_url}
+                src={fullAttachmentUrl}
                 alt="Attachment"
                 className="max-h-60 rounded-xl object-cover border border-black/10 cursor-pointer hover:opacity-95 transition-opacity"
-                onClick={() => window.open(message.attachment_url, '_blank')}
+                onClick={() => window.open(fullAttachmentUrl, '_blank')}
               />
             ) : (
               <a
-                href={message.attachment_url}
+                href={fullAttachmentUrl}
                 target="_blank"
                 rel="noreferrer"
                 className={`flex items-center space-x-2.5 p-2.5 rounded-xl border transition-colors ${
@@ -308,14 +311,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Text Content & Timestamp Flex Layout */}
         <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-0.5">
           {message.content && (
-            <span className="whitespace-pre-wrap break-words leading-snug flex-1 min-w-[20px]">
+            <p className="whitespace-pre-wrap break-words leading-relaxed flex-1">
               {message.content}
-            </span>
+            </p>
           )}
 
           <div
-            className={`inline-flex items-center space-x-1 text-[10px] select-none flex-shrink-0 self-end ml-auto pl-1 ${
-              isSentByMe ? 'text-blue-100/90' : 'text-gray-500 dark:text-gray-400'
+            className={`flex items-center space-x-1 text-[10px] ml-auto flex-shrink-0 pt-1 ${
+              isSentByMe ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
             }`}
           >
             <span>{formattedTime}</span>
@@ -323,21 +326,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         </div>
 
-        {/* Emoji Reactions Badge Pills */}
-        {Object.keys(reactionGroups).length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5 -mb-1">
-            {Object.entries(reactionGroups).map(([emoji, group]) => (
+        {/* Message Emoji Reactions Display */}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5 pt-1 border-t border-black/10 dark:border-white/10">
+            {Object.entries(
+              message.reactions.reduce<Record<string, number>>((acc, r) => {
+                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                return acc;
+              }, {})
+            ).map(([emoji, count]) => (
               <button
                 key={emoji}
                 onClick={() => handleToggleReaction(emoji)}
-                className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs transition-transform active:scale-95 shadow-xs border ${
-                  group.hasReacted
-                    ? 'bg-signal-blue/20 border-signal-blue text-signal-blue font-bold'
-                    : 'bg-signal-card/80 border-signal-border text-signal-text-primary hover:bg-signal-hover'
+                className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium transition-all ${
+                  isSentByMe
+                    ? 'bg-blue-700/50 text-white hover:bg-blue-700/70'
+                    : 'bg-black/10 dark:bg-white/10 text-signal-text-primary hover:bg-black/20'
                 }`}
               >
                 <span>{emoji}</span>
-                {group.count > 1 && <span className="text-[10px]">{group.count}</span>}
+                {count > 1 && <span className="text-[10px] opacity-90">{count}</span>}
               </button>
             ))}
           </div>

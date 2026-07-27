@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Phone, Video, MoreVertical, Lock, Users, Trash2, Sun, Moon, Eraser, Clock, Forward, CheckSquare, X } from 'lucide-react';
+import { Phone, Video, MoreVertical, Lock, Users, Trash2, Sun, Moon, Eraser, Clock, Forward, CheckSquare, X, LogOut } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { Conversation, Message } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
@@ -164,6 +164,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       const newMsg = await apiClient.sendMessage(
         conversation.id,
         content,
+        'text',
         attachmentUrl,
         attachmentType,
         replyToId
@@ -214,6 +215,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
         const sent = await apiClient.sendMessage(
           targetConvId,
           msg.content ? `[Forwarded] ${msg.content}` : '[Forwarded Attachment]',
+          'text',
           msg.attachment_url,
           msg.attachment_type
         );
@@ -253,15 +255,21 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   const handleDeleteChat = async () => {
     setIsMenuOpen(false);
     try {
-      if (conversation.type === 'group' && isGroupAdmin) {
-        await apiClient.deleteGroup(conversation.id);
+      if (conversation.type === 'group') {
+        if (isGroupAdmin) {
+          await apiClient.deleteGroup(conversation.id);
+        } else if (currentUser) {
+          await apiClient.removeGroupMember(conversation.id, currentUser.id);
+        }
       } else {
         await apiClient.deleteConversation(conversation.id);
       }
       removeConversation(conversation.id);
       router.push('/');
     } catch (err) {
-      console.error('Failed to delete conversation:', err);
+      console.error('Failed to delete/leave conversation:', err);
+      removeConversation(conversation.id);
+      router.push('/');
     }
   };
 
@@ -298,25 +306,27 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
             <button
               onClick={handleTriggerForwardBulk}
               disabled={selectedMessageIds.length === 0}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition-all"
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-40"
             >
-              <Forward className="w-4 h-4" />
+              <Forward className="w-3.5 h-3.5" />
               <span>Forward</span>
             </button>
+
             <button
               onClick={handleBulkDeleteForMe}
               disabled={selectedMessageIds.length === 0}
-              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition-all"
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-40"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Delete for me</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete For Me</span>
             </button>
+
             <button
               onClick={() => {
                 setIsSelectMode(false);
                 setSelectedMessageIds([]);
               }}
-              className="p-1.5 hover:bg-signal-hover rounded-full text-gray-400"
+              className="p-1.5 text-gray-400 hover:text-white rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -325,81 +335,89 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       )}
 
       {/* Header */}
-      <div className="h-16 px-4 bg-signal-sidebar border-b border-signal-border flex items-center justify-between flex-shrink-0">
-        <div
-          className="flex items-center space-x-3 cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={conversation.type === 'group' ? onOpenGroupDetails : undefined}
-        >
-          <Avatar
-            name={displayName}
-            src={avatarUrl}
-            size="md"
-            isOnline={conversation.type === 'direct' ? otherUserPresence?.is_online : undefined}
-          />
-          <div>
-            <div className="flex items-center space-x-1.5 font-semibold text-sm text-signal-text-primary">
-              <span>{displayName}</span>
-              <Lock className="w-3.5 h-3.5 text-signal-blue" title="Encrypted" />
-              {conversation.disappearing_timer > 0 && (
-                <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse" title="Disappearing Messages Active" />
-              )}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {conversation.type === 'group' ? (
-                <span>{conversation.members.length} members</span>
-              ) : otherUserPresence?.is_online ? (
-                <span className="text-emerald-500 dark:text-emerald-400 font-medium flex items-center space-x-1">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse mr-1 inline-block" />
-                  <span>Online</span>
-                </span>
-              ) : (
-                <span>{formatSignalLastSeen(otherUserPresence?.last_seen)}</span>
-              )}
+      <div className="h-16 border-b border-signal-border px-4 flex items-center justify-between bg-signal-sidebar/80 backdrop-blur-md z-10 flex-shrink-0">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div
+            onClick={conversation.type === 'group' ? onOpenGroupDetails : undefined}
+            className={`flex items-center space-x-3 ${
+              conversation.type === 'group' ? 'cursor-pointer hover:opacity-85' : ''
+            }`}
+          >
+            <Avatar
+              name={displayName}
+              src={avatarUrl}
+              size="md"
+              isOnline={conversation.type === 'direct' ? otherUserPresence?.is_online : false}
+            />
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-signal-text-primary truncate flex items-center space-x-1.5">
+                <span>{displayName}</span>
+                <Lock className="w-3 h-3 text-signal-text-secondary flex-shrink-0" />
+              </h2>
+              <p className="text-xs text-signal-text-secondary truncate">
+                {typingText ? (
+                  <span className="text-signal-blue font-medium animate-pulse">{typingText}</span>
+                ) : conversation.type === 'group' ? (
+                  `${conversation.members.length} members`
+                ) : otherUserPresence?.is_online ? (
+                  <span className="text-emerald-500 font-medium">Online</span>
+                ) : (
+                  formatSignalLastSeen(otherUserPresence?.last_seen)
+                )}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Action icons & theme toggle */}
-        <div className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 relative" ref={menuRef}>
-          {/* Disappearing Messages Timer Button */}
-          <button
-            onClick={() => setIsTimerMenuOpen(!isTimerMenuOpen)}
-            className={`p-2 hover:bg-signal-hover rounded-full transition-colors ${
-              conversation.disappearing_timer > 0 ? 'text-amber-500' : 'text-gray-400'
-            }`}
-            title="Disappearing Messages Timer"
-          >
-            <Clock className="w-5 h-5" />
-          </button>
+        {/* Action Controls */}
+        <div className="flex items-center space-x-1 text-signal-text-secondary relative" ref={menuRef}>
+          {/* Disappearing Messages Timer Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsTimerMenuOpen(!isTimerMenuOpen)}
+              className={`p-2 rounded-full transition-colors ${
+                conversation.disappearing_timer > 0
+                  ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
+                  : 'hover:bg-signal-hover'
+              }`}
+              title="Disappearing messages timer"
+            >
+              <Clock className="w-5 h-5" />
+            </button>
 
-          {/* Disappearing Timer Menu */}
-          {isTimerMenuOpen && (
-            <div className="absolute right-20 top-12 w-48 bg-signal-sidebar border border-signal-border rounded-2xl shadow-2xl z-50 py-1 text-xs text-signal-text-primary">
-              <div className="px-3 py-1.5 font-bold text-signal-text-secondary border-b border-signal-border">
-                Disappearing Messages
+            {isTimerMenuOpen && (
+              <div className="absolute right-0 top-12 w-48 bg-signal-sidebar border border-signal-border rounded-2xl shadow-2xl z-50 py-1 text-xs text-signal-text-primary">
+                <div className="px-3 py-2 border-b border-signal-border text-[11px] font-bold text-signal-text-secondary uppercase tracking-wider">
+                  Disappearing Messages
+                </div>
+                {TIMER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.seconds}
+                    onClick={() => handleSetTimer(opt.seconds)}
+                    className={`w-full text-left px-4 py-2 hover:bg-signal-hover flex items-center justify-between ${
+                      conversation.disappearing_timer === opt.seconds
+                        ? 'text-signal-blue font-bold bg-signal-blue/10'
+                        : ''
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {conversation.disappearing_timer === opt.seconds && (
+                      <span className="w-2 h-2 bg-signal-blue rounded-full" />
+                    )}
+                  </button>
+                ))}
               </div>
-              {TIMER_OPTIONS.map((opt) => (
-                <button
-                  key={opt.seconds}
-                  onClick={() => handleSetTimer(opt.seconds)}
-                  className={`w-full text-left px-4 py-2 hover:bg-signal-hover flex items-center justify-between ${
-                    (conversation.disappearing_timer || 0) === opt.seconds ? 'text-signal-blue font-bold' : ''
-                  }`}
-                >
-                  <span>{opt.label}</span>
-                  {(conversation.disappearing_timer || 0) === opt.seconds && <span>✓</span>}
-                </button>
-              ))}
-            </div>
-          )}
+            )}
+          </div>
 
           <button
             onClick={toggleTheme}
-            className="p-2 hover:bg-signal-hover rounded-full transition-colors text-amber-500 dark:text-amber-400"
-            title="Toggle Light/Dark Theme"
+            className="p-2 hover:bg-signal-hover rounded-full transition-colors"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+            {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-400" />}
           </button>
+
           <button
             onClick={() => onShowComingSoon?.('Voice Call')}
             className="p-2 hover:bg-signal-hover rounded-full transition-colors"
@@ -453,14 +471,24 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
                 <span>Clear Chat History</span>
               </button>
 
-              {conversation.type === 'group' && isGroupAdmin ? (
-                <button
-                  onClick={handleDeleteChat}
-                  className="w-full flex items-center space-x-2 px-4 py-2.5 hover:bg-signal-hover text-rose-500 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Group (Admin)</span>
-                </button>
+              {conversation.type === 'group' ? (
+                isGroupAdmin ? (
+                  <button
+                    onClick={handleDeleteChat}
+                    className="w-full flex items-center space-x-2 px-4 py-2.5 hover:bg-signal-hover text-rose-500 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Group (Admin)</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleDeleteChat}
+                    className="w-full flex items-center space-x-2 px-4 py-2.5 hover:bg-signal-hover text-rose-500 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Group</span>
+                  </button>
+                )
               ) : (
                 <button
                   onClick={handleDeleteChat}
@@ -518,21 +546,19 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       </div>
 
       {/* Input */}
-      <MessageInput
-        conversationId={conversation.id}
-        onSendMessage={handleSendMessage}
-      />
+      <MessageInput conversationId={conversation.id} onSendMessage={handleSendMessage} />
 
       {/* Forward Modal */}
-      <ForwardModal
-        isOpen={isForwardModalOpen}
-        conversations={conversations}
-        onClose={() => {
-          setIsForwardModalOpen(false);
-          setForwardingMsg(null);
-        }}
-        onForwardToConversation={handleForwardToDestination}
-      />
+      {isForwardModalOpen && (
+        <ForwardModal
+          isOpen={isForwardModalOpen}
+          onClose={() => {
+            setIsForwardModalOpen(false);
+            setForwardingMsg(null);
+          }}
+          onSelectDestination={handleForwardToDestination}
+        />
+      )}
     </div>
   );
 };

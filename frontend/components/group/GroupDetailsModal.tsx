@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Shield, UserMinus, UserPlus, LogOut } from 'lucide-react';
-import { Conversation, Contact } from '@/lib/types';
+import { Conversation, User } from '@/lib/types';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/lib/store/useAuthStore';
 import { useChatStore } from '@/lib/store/useChatStore';
@@ -25,23 +25,25 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   const router = useRouter();
   const { user: currentUser } = useAuthStore();
   const { removeConversation } = useChatStore();
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [error, setError] = useState('');
 
-  const currentMember = conversation.members.find((m) => m.user_id === currentUser?.id);
+  const currentMember = conversation.members.find((m) => Number(m.user_id) === Number(currentUser?.id));
   const isAdmin = currentMember?.role === 'admin';
 
   useEffect(() => {
     if (isOpen) {
-      apiClient.getContacts().then(setContacts).catch(console.error);
+      apiClient.searchUsers('')
+        .then(setAvailableUsers)
+        .catch(() => apiClient.getContacts().then(setAvailableUsers).catch(console.error));
     }
   }, [isOpen]);
 
   const handleRemove = async (targetUserId: number) => {
     try {
-      const isSelf = targetUserId === currentUser?.id;
+      const isSelf = Number(targetUserId) === Number(currentUser?.id);
       const updated = await apiClient.removeGroupMember(conversation.id, targetUserId);
       if (isSelf) {
         removeConversation(conversation.id);
@@ -51,7 +53,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
         onUpdateGroup(updated);
       }
     } catch (err: unknown) {
-      const isSelf = targetUserId === currentUser?.id;
+      const isSelf = Number(targetUserId) === Number(currentUser?.id);
       if (isSelf) {
         removeConversation(conversation.id);
         onClose();
@@ -78,9 +80,9 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter contacts not already in group
-  const existingMemberUserIds = new Set(conversation.members.map((m) => m.user_id));
-  const availableContacts = contacts.filter((c) => !existingMemberUserIds.has(c.contact_user_id));
+  // Filter users not already in group
+  const existingMemberUserIds = new Set(conversation.members.map((m) => Number(m.user_id)));
+  const addableUsers = availableUsers.filter((u) => !existingMemberUserIds.has(Number(u.id)));
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -117,24 +119,24 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
           {isAdding && (
             <div className="p-3 bg-signal-card rounded-xl border border-signal-border mb-3 space-y-2">
-              <span className="text-xs font-semibold text-gray-300">Select contact to add:</span>
-              {availableContacts.length === 0 ? (
-                <p className="text-xs text-gray-500">No new contacts available to add</p>
+              <span className="text-xs font-semibold text-gray-300">Select user to add:</span>
+              {addableUsers.length === 0 ? (
+                <p className="text-xs text-gray-500">No new users available to add</p>
               ) : (
-                availableContacts.map((c) => (
-                  <label key={c.id} className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
+                addableUsers.map((u) => (
+                  <label key={u.id} className="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedUserIds.includes(c.contact_user_id)}
+                      checked={selectedUserIds.includes(u.id)}
                       onChange={(e) => {
-                        const uid = c.contact_user_id;
+                        const uid = u.id;
                         setSelectedUserIds((prev) =>
                           e.target.checked ? [...prev, uid] : prev.filter((id) => id !== uid)
                         );
                       }}
                       className="rounded border-gray-600"
                     />
-                    <span>{c.nickname || c.contact_user.display_name || c.contact_user.username}</span>
+                    <span>{u.display_name || u.username || u.phone_number}</span>
                   </label>
                 ))
               )}
@@ -158,7 +160,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
           )}
 
           {conversation.members.map((mem) => {
-            const isMe = mem.user_id === currentUser?.id;
+            const isMe = Number(mem.user_id) === Number(currentUser?.id);
             return (
               <div
                 key={mem.id}
@@ -181,7 +183,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
 
                 <div className="flex items-center space-x-2">
                   {mem.role === 'admin' && (
-                    <span className="flex items-center space-x-1 text-[10px] bg-blue-950/60 border border-blue-800/60 text-blue-400 px-2 py-0.5 rounded-md font-medium">
+                    <span className="flex items-center space-x-1 px-2 py-0.5 bg-signal-blue/20 text-signal-blue text-[10px] rounded-full font-medium">
                       <Shield className="w-3 h-3" />
                       <span>Admin</span>
                     </span>
@@ -190,7 +192,7 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
                   {isAdmin && !isMe && (
                     <button
                       onClick={() => handleRemove(mem.user_id)}
-                      className="p-1.5 text-gray-400 hover:text-rose-400 transition-colors"
+                      className="p-1 text-gray-400 hover:text-rose-400 rounded-lg hover:bg-rose-950/30 transition-colors"
                       title="Remove member"
                     >
                       <UserMinus className="w-4 h-4" />
@@ -202,19 +204,13 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
           })}
         </div>
 
-        <div className="p-4 border-t border-signal-border flex justify-between">
+        <div className="p-4 border-t border-signal-border bg-signal-card/30">
           <button
-            onClick={() => currentUser && handleRemove(currentUser.id)}
-            className="flex items-center space-x-1.5 text-xs font-medium text-rose-400 hover:text-rose-300"
+            onClick={() => handleRemove(currentUser!.id)}
+            className="w-full flex items-center justify-center space-x-2 py-2 text-rose-500 hover:bg-rose-950/30 rounded-xl text-xs font-semibold transition-colors"
           >
             <LogOut className="w-4 h-4" />
             <span>Leave Group</span>
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-signal-card text-xs font-medium text-gray-300 hover:text-white rounded-lg border border-signal-border"
-          >
-            Close
           </button>
         </div>
       </div>
