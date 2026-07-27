@@ -31,6 +31,15 @@ async def update_my_profile(
     return await user_service.update_me(db, current_user, req)
 
 
+@router.get("/users", response_model=List[UserRead])
+async def get_all_users_list(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[UserRead]:
+    """Retrieve list of all registered users except current_user."""
+    return await user_service.search_users(db, current_user, "")
+
+
 @router.get("/users/search", response_model=List[UserRead])
 async def search_users_list(
     q: Optional[str] = Query(None),

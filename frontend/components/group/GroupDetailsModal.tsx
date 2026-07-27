@@ -36,11 +36,12 @@ export const GroupDetailsModal: React.FC<GroupDetailsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       Promise.all([
+        apiClient.getUsers().catch(() => []),
         apiClient.searchUsers('').catch(() => []),
         apiClient.getContacts().catch(() => []),
-      ]).then(([searched, contacts]) => {
+      ]).then(([allUsers, searched, contacts]) => {
         const contactUsers = (contacts as any[]).map((c) => c.contact_user || c);
-        const combined = [...searched, ...contactUsers];
+        const combined = [...allUsers, ...searched, ...contactUsers];
         const uniqueUsersMap = new Map<number, User>();
         combined.forEach((u) => {
           if (u && u.id && Number(u.id) !== Number(currentUser?.id)) {
