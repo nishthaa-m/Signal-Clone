@@ -4,6 +4,34 @@ A full-stack, end-to-end encrypted messaging web application inspired by **Signa
 
 ---
 
+## 🌐 Live Application Demo & Evaluation
+
+> 🔗 **Live Demo URL**: [https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc)
+
+### 🧪 How Evaluators Can Test Real-Time Functionality
+
+To test real-time messaging, typing indicators, read receipts, and online status live:
+
+1. **Open Two Browser Windows**:
+   - Window 1: Open the [Live Demo](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc) in standard mode.
+   - Window 2: Open the [Live Demo](https://signal-clone-nishthamaheshwari2020-1197s-projects.vercel.app?_vercel_share=JWSeTnrNw2IzlkzSWs8Rf1FJIDB8KWwc) in an Incognito / Private window.
+
+2. **Login as Pre-seeded Users**:
+   - **Window 1**: Click **Alice Smith** (or enter `5550001001` or `alice_smith`), enter OTP `123456`.
+   - **Window 2**: Click **Bob Jones** (or enter `5550001002` or `bob_jones`), enter OTP `123456`.
+
+3. **Real-Time Testing Steps**:
+   - 💬 **Messaging & Checkmarks**: Send a message from Alice to Bob. Observe single checkmark (sent), double checkmark (delivered), and double blue checkmark (read) update in real-time.
+   - ✍️ **Typing Indicators**: Type text in Alice's input bar — observe `"Alice Smith is typing..."` appear live in Bob's chat window.
+   - 📎 **Attachments**: Click the paperclip `📎` icon to send images or file attachments.
+   - 😍 **Emoji Reactions**: Hover over a message bubble and click the emoji picker to react in real-time.
+   - ↩️ **Quoted Replies**: Click the reply button `↩️` on a message bubble to quote and reply.
+   - ⏱️ **Disappearing Messages**: Open the clock `⏱️` menu in the chat header and set a timer (e.g. 5 seconds). Send a message and watch it self-destruct simultaneously across both windows and the left sidebar.
+   - ☑️ **Multi-Select & Forwarding**: Open the message action menu `...` ➔ click **Select** to select multiple messages and test bulk **"Delete for Me"** or **"Forward"**.
+   - 👥 **Group Administration**: Click **+** to create a new group, add members, or test leaving the group.
+
+---
+
 ## 🚀 Tech Stack
 
 ### Backend
@@ -158,7 +186,7 @@ Use any of these pre-seeded demo accounts to test multi-window real-time chat:
 
 ---
 
-## ⚙️ Setup & Installation
+## ⚙️ Local Setup & Installation
 
 ### Prerequisites
 - Node.js (v18+)
@@ -204,5 +232,5 @@ npm run dev
 ## 📌 Assumptions Made
 
 1. **OTP Verification**: SMS gateway is simulated using a fixed OTP (`123456`) for instant testing and demonstration.
-2. **File Storage**: Uploaded file and image attachments are stored locally inside `frontend/public/uploads` and served via FastAPI static file mounting at `/uploads`.
+2. **File Storage**: Uploaded file and image attachments are stored locally inside `frontend/public/uploads` and served via static file middleware.
 3. **Database**: SQLite is used for lightweight, zero-configuration local persistence (`backend/signal_clone.db`).
